@@ -65,6 +65,7 @@ static inline void bch2_ratelimit_atomic_reset(struct ratelimit_state *rs)
 #include <linux/bio.h>
 #include <linux/string.h>
 #include <linux/blk_types.h>
+#include <linux/blkdev.h>
 #include <linux/fs_parser.h>
 #include <crypto/chacha.h>
 
@@ -568,6 +569,9 @@ restart:
 	return &n->data[iter->offset & (GENRADIX_NODE_SIZE - 1)];
 }
 
+#define __genradix_page_remainder(_radix)			\
+	(GENRADIX_NODE_SIZE % sizeof((_radix)->type[0]))
+
 #define genradix_iter_peek_prev(_iter, _radix)			\
 	(__genradix_cast(_radix)				\
 	 __genradix_iter_peek_prev(_iter, &(_radix)->tree,	\
@@ -603,6 +607,122 @@ static inline void __genradix_iter_rewind(struct genradix_iter *iter,
 	for (_iter = genradix_iter_init(_radix,	genradix_last_pos(_radix));\
 	     (_p = genradix_iter_peek_prev(&_iter, _radix)) != NULL;\
 	     genradix_iter_rewind(&_iter, _radix))
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 9, 0)
+struct bdev_inode {
+	struct block_device bdev;
+	struct inode vfs_inode;
+};
+
+static  __cacheline_aligned_in_smp DEFINE_MUTEX(bdev_lock);
+
+static inline struct bdev_inode *BDEV_I(struct inode *inode)
+{
+	return container_of(inode, struct bdev_inode, vfs_inode);
+}
+
+static inline struct inode *BD_INODE(struct block_device *bdev)
+{
+	return &container_of(bdev, struct bdev_inode, bdev)->vfs_inode;
+}
+
+static inline struct block_device *file_bdev(struct file *bdev_file)
+{
+	return I_BDEV(bdev_file->f_mapping->host);
+}
+
+static inline bool bdev_unclaimed(const struct file *bdev_file)
+{
+	return bdev_file->private_data == BDEV_I(bdev_file->f_mapping->host);
+}
+
+static inline bool bdev_test_flag(const struct block_device *bdev, unsigned flag)
+{
+	return atomic_read(&bdev->__bd_flags) & flag;
+}
+
+static inline void bdev_set_flag(struct block_device *bdev, unsigned flag)
+{
+	atomic_or(flag, &bdev->__bd_flags);
+}
+
+static inline void bdev_clear_flag(struct block_device *bdev, unsigned flag)
+{
+	atomic_andnot(flag, &bdev->__bd_flags);
+}
+
+static void bd_end_claim(struct block_device *bdev, void *holder)
+{
+	struct block_device *whole = bdev_whole(bdev);
+	bool unblock = false;
+
+	/*
+	 * Release a claim on the device.  The holder fields are protected with
+	 * bdev_lock.  open_mutex is used to synchronize disk_holder unlinking.
+	 */
+	mutex_lock(&bdev_lock);
+	WARN_ON_ONCE(bdev->bd_holder != holder);
+	WARN_ON_ONCE(--bdev->bd_holders < 0);
+	WARN_ON_ONCE(--whole->bd_holders < 0);
+	if (!bdev->bd_holders) {
+		mutex_lock(&bdev->bd_holder_lock);
+		bdev->bd_holder = NULL;
+		bdev->bd_holder_ops = NULL;
+		mutex_unlock(&bdev->bd_holder_lock);
+		if (bdev_test_flag(bdev, BD_WRITE_HOLDER))
+			unblock = true;
+	}
+	if (!whole->bd_holders)
+		whole->bd_holder = NULL;
+	mutex_unlock(&bdev_lock);
+
+	/*
+	 * If this was the last claim, remove holder link and unblock evpoll if
+	 * it was a write holder.
+	 */
+	if (unblock) {
+		disk_unblock_events(bdev->bd_disk);
+		bdev_clear_flag(bdev, BD_WRITE_HOLDER);
+	}
+}
+
+static inline void bd_yield_claim(struct file *bdev_file)
+{
+	struct block_device *bdev = file_bdev(bdev_file);
+	void *holder = bdev_file->private_data;
+
+	lockdep_assert_held(&bdev->bd_disk->open_mutex);
+
+	if (WARN_ON_ONCE(IS_ERR_OR_NULL(holder)))
+		return;
+
+	if (!bdev_unclaimed(bdev_file))
+		bd_end_claim(bdev, holder);
+}
+
+static inline void bdev_fput(struct file *bdev_file)
+{
+	if (WARN_ON_ONCE(bdev_file->f_op != &def_blk_fops))
+		return;
+
+	if (bdev_file->private_data) {
+		struct block_device *bdev = file_bdev(bdev_file);
+		struct gendisk *disk = bdev->bd_disk;
+
+		mutex_lock(&disk->open_mutex);
+		bd_yield_claim(bdev_file);
+		/*
+		 * Tell release we already gave up our hold on the
+		 * device and if write restrictions are available that
+		 * we already gave up write access to the device.
+		 */
+		bdev_file->private_data = BDEV_I(bdev_file->f_mapping->host);
+		mutex_unlock(&disk->open_mutex);
+	}
+
+	fput(bdev_file);
+}
 #endif
 
 #endif /* __KERNEL__ */
