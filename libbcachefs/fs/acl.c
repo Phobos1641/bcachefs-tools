@@ -335,7 +335,7 @@ int bch2_set_acl_trans(struct btree_trans *trans, subvol_inum inum,
 }
 
 static int __bch2_set_acl(struct btree_trans *trans,
-			  struct mnt_idmap *idmap,
+			  struct bch_idmap *idmap,
 			  struct bch_inode_info *inode,
 			  struct posix_acl *acl, int type)
 {
@@ -363,7 +363,20 @@ static int __bch2_set_acl(struct btree_trans *trans,
 	return 0;
 }
 
-int bch2_set_acl(struct mnt_idmap *idmap,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 2, 0)
+int bch2_set_acl(struct bch_idmap *idmap,
+		 struct inode *vinode,
+		 struct posix_acl *acl, int type)
+{
+	struct bch_inode_info *inode = to_bch_ei(vinode);
+	struct bch_fs *c = inode->v.i_sb->s_fs_info;
+
+	guard(mutex)(&inode->ei_update_lock);
+	CLASS(btree_trans, trans)(c);
+	return lockrestart_do(trans, __bch2_set_acl(trans, idmap, inode, acl, type));
+}
+#else
+int bch2_set_acl(struct bch_idmap *idmap,
 		 struct dentry *dentry,
 		 struct posix_acl *acl, int type)
 {
@@ -374,6 +387,7 @@ int bch2_set_acl(struct mnt_idmap *idmap,
 	CLASS(btree_trans, trans)(c);
 	return lockrestart_do(trans, __bch2_set_acl(trans, idmap, inode, acl, type));
 }
+#endif
 
 int bch2_acl_chmod(struct btree_trans *trans, subvol_inum inum,
 		   struct bch_inode_unpacked *inode,

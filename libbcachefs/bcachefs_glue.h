@@ -51,6 +51,8 @@ static inline void bch2_ratelimit_atomic_reset(struct ratelimit_state *rs)
 #define bch2_bio_add_virt_nofail(_bio, _vaddr, _len) \
 	bio_add_virt_nofail(_bio, _vaddr, _len)
 
+#define bch_idmap mnt_idmap
+
 #else
 
 #include <linux/cleanup.h>
@@ -637,20 +639,50 @@ static inline bool bdev_unclaimed(const struct file *bdev_file)
 	return bdev_file->private_data == BDEV_I(bdev_file->f_mapping->host);
 }
 
-static inline bool bdev_test_flag(const struct block_device *bdev, unsigned flag)
+#ifndef BD_WRITE_HOLDER
+#define bch2_bdev_test_flag_holder(_bdev) ((_bdev)->bd_write_holder == true)
+#define bch2_bdev_set_flag_holder(_bdev) ((_bdev)->bd_write_holder = true)
+#define bch2_bdev_clear_flag_holder(_bdev) ((_bdev)->bd_write_holder = false)
+#else
+#define bch2_bdev_test_flag_holder(_bdev) bdev_test_flag((_bdev), BD_WRITE_HOLDER)
+#define bch2_bdev_set_flag_holder(_bdev) bdev_set_flag((_bdev), BD_WRITE_HOLDER)
+#define bch2_bdev_clear_flag_holder(_bdev) bdev_clear_flag((_bdev), BD_WRITE_HOLDER)
+#endif
+
+#if 0
+static void __disk_unblock_events(struct gendisk *disk, bool check_now)
 {
-	return atomic_read(&bdev->__bd_flags) & flag;
+	struct disk_events *ev = disk->ev;
+	unsigned long intv;
+	unsigned long flags;
+
+	spin_lock_irqsave(&ev->lock, flags);
+
+	if (WARN_ON_ONCE(ev->block <= 0))
+		goto out_unlock;
+
+	if (--ev->block)
+		goto out_unlock;
+
+	intv = disk_events_poll_jiffies(disk);
+	if (check_now)
+		queue_delayed_work(system_freezable_power_efficient_wq,
+				&ev->dwork, 0);
+	else if (intv)
+		queue_delayed_work(system_freezable_power_efficient_wq,
+				&ev->dwork, intv);
+out_unlock:
+	spin_unlock_irqrestore(&ev->lock, flags);
 }
 
-static inline void bdev_set_flag(struct block_device *bdev, unsigned flag)
+void disk_unblock_events(struct gendisk *disk)
 {
-	atomic_or(flag, &bdev->__bd_flags);
+	if (disk->ev)
+		__disk_unblock_events(disk, false);
 }
+#endif
 
-static inline void bdev_clear_flag(struct block_device *bdev, unsigned flag)
-{
-	atomic_andnot(flag, &bdev->__bd_flags);
-}
+extern void disk_unblock_events(struct gendisk *disk);
 
 static void bd_end_claim(struct block_device *bdev, void *holder)
 {
@@ -670,7 +702,7 @@ static void bd_end_claim(struct block_device *bdev, void *holder)
 		bdev->bd_holder = NULL;
 		bdev->bd_holder_ops = NULL;
 		mutex_unlock(&bdev->bd_holder_lock);
-		if (bdev_test_flag(bdev, BD_WRITE_HOLDER))
+		if (bch2_bdev_test_flag_holder(bdev))
 			unblock = true;
 	}
 	if (!whole->bd_holders)
@@ -683,7 +715,7 @@ static void bd_end_claim(struct block_device *bdev, void *holder)
 	 */
 	if (unblock) {
 		disk_unblock_events(bdev->bd_disk);
-		bdev_clear_flag(bdev, BD_WRITE_HOLDER);
+		bch2_bdev_clear_flag_holder(bdev);
 	}
 }
 
@@ -723,6 +755,15 @@ static inline void bdev_fput(struct file *bdev_file)
 
 	fput(bdev_file);
 }
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 2, 0)
+#define bch_idmap user_namespace
+
+#define file_mnt_idmap(_fp) \
+	file_mnt_user_ns(_fp)
+#else
+#define bch_idmap mnt_idmap
 #endif
 
 #endif /* __KERNEL__ */

@@ -458,7 +458,7 @@ static inline void bch2_iput(struct bch_inode_info *inode) { iput(&inode->v); }
 DEFINE_DARRAY_NAMED_FREE_ITEM(darray_inode, struct bch_inode_info *, bch2_iput);
 
 static int bch2_check_path_accessible(struct btree_trans *trans,
-				      struct mnt_idmap *idmap,
+				      struct bch_idmap *idmap,
 				      struct bch_subvolume *child,
 				      u32 child_subvol, u32 parent_subvol)
 {
@@ -513,7 +513,7 @@ check_perms:
 }
 
 static int bch2_subvol_readdir_emit(struct btree_trans *trans,
-				    struct mnt_idmap *idmap,
+				    struct bch_idmap *idmap,
 				    u32 parent, u32 child_subvol,
 				    char __user *buf, u32 buf_size,
 				    u32 *used, u32 *pos)
@@ -590,7 +590,7 @@ static long bch2_ioctl_subvolume_list(struct bch_fs *c, struct file *filp,
 		return bch_err_throw(c, EINVAL_subvol_readdir_pad);
 
 	u32 parent = inode_inum(file_bch_inode(filp)).subvol;
-	struct mnt_idmap *idmap = file_mnt_idmap(filp);
+	struct bch_idmap *idmap = file_mnt_idmap(filp);
 
 	char __user *buf = (char __user *)(unsigned long)arg.buf;
 	u32 used = 0;
