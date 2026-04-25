@@ -345,7 +345,7 @@ static int bch2_xattr_get_handler(const struct xattr_handler *handler,
 }
 
 static int bch2_xattr_set_handler(const struct xattr_handler *handler,
-				  struct mnt_idmap *idmap,
+				  struct bch_idmap *idmap,
 				  struct dentry *dentry, struct inode *vinode,
 				  const char *name, const void *value,
 				  size_t size, int flags)
@@ -503,7 +503,7 @@ static int inode_opt_set_fn(struct btree_trans *trans,
 }
 
 static int __bch2_xattr_bcachefs_set(const struct xattr_handler *handler,
-				     struct mnt_idmap *idmap,
+				     struct bch_idmap *idmap,
 				     struct dentry *dentry, struct inode *vinode,
 				     const char *name, const void *value,
 				     size_t size, int flags)
@@ -572,7 +572,7 @@ static int __bch2_xattr_bcachefs_set(const struct xattr_handler *handler,
 }
 
 static int bch2_xattr_bcachefs_set(const struct xattr_handler *handler,
-				   struct mnt_idmap *idmap,
+				   struct bch_idmap *idmap,
 				   struct dentry *dentry, struct inode *vinode,
 				   const char *name, const void *value,
 				   size_t size, int flags)
@@ -598,7 +598,7 @@ static int bch2_xattr_bcachefs_get_effective(
 
 /* Noop - xattrs in the bcachefs_effective namespace are inherited */
 static int bch2_xattr_bcachefs_set_effective(const struct xattr_handler *handler,
-				   struct mnt_idmap *idmap,
+				   struct bch_idmap *idmap,
 				   struct dentry *dentry, struct inode *vinode,
 				   const char *name, const void *value,
 				   size_t size, int flags)

@@ -33,7 +33,11 @@ struct posix_acl *bch2_get_acl(struct inode *, int, bool);
 int bch2_set_acl_trans(struct btree_trans *, subvol_inum,
 		       struct bch_inode_unpacked *,
 		       struct posix_acl *, int);
-int bch2_set_acl(struct mnt_idmap *, struct dentry *, struct posix_acl *, int);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 2, 0)
+int bch2_set_acl(struct bch_idmap *, struct inode *, struct posix_acl *, int);
+#else
+int bch2_set_acl(struct bch_idmap *, struct dentry *, struct posix_acl *, int);
+#endif
 int bch2_acl_chmod(struct btree_trans *, subvol_inum,
 		   struct bch_inode_unpacked *,
 		   umode_t, struct posix_acl **);

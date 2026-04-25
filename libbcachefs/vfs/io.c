@@ -417,7 +417,7 @@ static int bch2_truncate_folios(struct bch_inode_info *inode,
 	return ret;
 }
 
-static int bch2_extend(struct mnt_idmap *idmap,
+static int bch2_extend(struct bch_idmap *idmap,
 		       struct bch_inode_info *inode,
 		       struct bch_inode_unpacked *inode_u,
 		       struct iattr *iattr)
@@ -438,7 +438,7 @@ static int bch2_extend(struct mnt_idmap *idmap,
 	return bch2_setattr_nonsize(idmap, inode, iattr);
 }
 
-int bchfs_truncate(struct mnt_idmap *idmap,
+int bchfs_truncate(struct bch_idmap *idmap,
 		  struct bch_inode_info *inode, struct iattr *iattr)
 {
 	struct bch_fs *c = inode->v.i_sb->s_fs_info;

@@ -550,7 +550,7 @@ struct inode *bch2_vfs_inode_get(struct bch_fs *c, subvol_inum inum,
 }
 
 struct bch_inode_info *
-__bch2_create(struct mnt_idmap *idmap,
+__bch2_create(struct bch_idmap *idmap,
 	      struct bch_inode_info *dir, struct dentry *dentry,
 	      umode_t mode, dev_t rdev, subvol_inum snapshot_src,
 	      unsigned flags)
@@ -761,7 +761,7 @@ static struct dentry *bch2_lookup(struct inode *vdir, struct dentry *dentry,
 	return d_splice_alias(&inode->v, dentry);
 }
 
-static int bch2_mknod(struct mnt_idmap *idmap,
+static int bch2_mknod(struct bch_idmap *idmap,
 		      struct inode *vdir, struct dentry *dentry,
 		      umode_t mode, dev_t rdev)
 {
@@ -776,7 +776,7 @@ static int bch2_mknod(struct mnt_idmap *idmap,
 	return 0;
 }
 
-static int bch2_create(struct mnt_idmap *idmap,
+static int bch2_create(struct bch_idmap *idmap,
 		       struct inode *vdir, struct dentry *dentry,
 		       umode_t mode, bool excl)
 {
@@ -874,7 +874,7 @@ static int bch2_unlink(struct inode *vdir, struct dentry *dentry)
 	return bch2_err_class(ret);
 }
 
-static int bch2_symlink(struct mnt_idmap *idmap,
+static int bch2_symlink(struct bch_idmap *idmap,
 			struct inode *vdir, struct dentry *dentry,
 			const char *symname)
 {
@@ -907,7 +907,7 @@ err:
 	return bch2_err_class(ret);
 }
 
-static struct dentry *bch2_mkdir(struct mnt_idmap *idmap,
+static struct dentry *bch2_mkdir(struct bch_idmap *idmap,
 				 struct inode *vdir, struct dentry *dentry, umode_t mode)
 {
 	return ERR_PTR(bch2_mknod(idmap, vdir, dentry, mode|S_IFDIR, 0));
@@ -918,7 +918,7 @@ static struct dentry *bch2_mkdir(struct mnt_idmap *idmap,
  * Compat thunk: bcachefs's bch2_mkdir currently only ever returns NULL
  * (success, dentry already instantiated by bch2_mknod) or ERR_PTR(-errno).
  */
-static inline int bch2_mkdir_compat(struct mnt_idmap *idmap,
+static inline int bch2_mkdir_compat(struct bch_idmap *idmap,
                                     struct inode *dir,
                                     struct dentry *dentry,
                                     umode_t mode)
@@ -947,7 +947,7 @@ static inline int bch2_mkdir_compat(struct mnt_idmap *idmap,
 #define BCH2_MKDIR_OP  bch2_mkdir
 #endif
 
-static int bch2_rename2(struct mnt_idmap *idmap,
+static int bch2_rename2(struct bch_idmap *idmap,
 			struct inode *src_vdir, struct dentry *src_dentry,
 			struct inode *dst_vdir, struct dentry *dst_dentry,
 			unsigned flags)
@@ -1084,7 +1084,7 @@ err:
 	return bch2_err_class(ret);
 }
 
-static void bch2_setattr_copy(struct mnt_idmap *idmap,
+static void bch2_setattr_copy(struct bch_idmap *idmap,
 			      struct bch_inode_info *inode,
 			      struct bch_inode_unpacked *bi,
 			      struct iattr *attr)
@@ -1127,7 +1127,7 @@ static void bch2_setattr_copy(struct mnt_idmap *idmap,
 }
 
 static int bch2_setattr_nonsize_trans(struct btree_trans *trans,
-				      struct mnt_idmap *idmap,
+				      struct bch_idmap *idmap,
 				      struct bch_inode_info *inode,
 				      struct iattr *attr)
 {
@@ -1155,7 +1155,7 @@ static int bch2_setattr_nonsize_trans(struct btree_trans *trans,
 	return 0;
 }
 
-int bch2_setattr_nonsize(struct mnt_idmap *idmap,
+int bch2_setattr_nonsize(struct bch_idmap *idmap,
 			 struct bch_inode_info *inode,
 			 struct iattr *attr)
 {
@@ -1181,7 +1181,7 @@ int bch2_setattr_nonsize(struct mnt_idmap *idmap,
 	return lockrestart_do(trans, bch2_setattr_nonsize_trans(trans, idmap, inode, attr));
 }
 
-static int bch2_getattr(struct mnt_idmap *idmap,
+static int bch2_getattr(struct bch_idmap *idmap,
 			const struct path *path, struct kstat *stat,
 			u32 request_mask, unsigned query_flags)
 {
@@ -1237,7 +1237,7 @@ static int bch2_getattr(struct mnt_idmap *idmap,
 	return 0;
 }
 
-static int bch2_setattr(struct mnt_idmap *idmap,
+static int bch2_setattr(struct bch_idmap *idmap,
 			struct dentry *dentry, struct iattr *iattr)
 {
 	struct bch_inode_info *inode = to_bch_ei(dentry->d_inode);
@@ -1254,7 +1254,7 @@ static int bch2_setattr(struct mnt_idmap *idmap,
 	return bch2_err_class(ret);
 }
 
-static int bch2_tmpfile(struct mnt_idmap *idmap,
+static int bch2_tmpfile(struct bch_idmap *idmap,
 			struct inode *vdir, struct file *file, umode_t mode)
 {
 	struct bch_inode_info *inode =
@@ -1415,7 +1415,7 @@ static int fssetxattr_inode_update_fn(struct btree_trans *trans,
 	return 0;
 }
 
-static int bch2_fileattr_set(struct mnt_idmap *idmap,
+static int bch2_fileattr_set(struct bch_idmap *idmap,
 			     struct dentry *dentry,
 			     struct file_kattr *fa)
 {
