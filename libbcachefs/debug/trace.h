@@ -6,6 +6,8 @@
 
 #include <linux/tracepoint.h>
 
+#include "bcachefs_glue.h"
+
 DECLARE_EVENT_CLASS(fs_str,
 	TP_PROTO(struct bch_fs *c, const char *str),
 	TP_ARGS(c, str),
@@ -17,7 +19,7 @@ DECLARE_EVENT_CLASS(fs_str,
 
 	TP_fast_assign(
 		strscpy(__entry->fs, c->name, sizeof(__entry->fs));
-		__assign_str(str);
+		__bch2_assign_str(str);
 	),
 
 	TP_printk("%s: %s", __entry->fs, __get_str(str))

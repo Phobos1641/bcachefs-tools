@@ -17,6 +17,20 @@
 #define __force
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
+#define __bch2_assign_str(dst)                                               \
+    do {                                                                \
+        char *__str__ = __get_str(dst);                                 \
+        int __len__ = __get_dynamic_array_len(dst) - 1;                 \
+        WARN_ON_ONCE(!(dst));                                           \
+        memcpy(__str__, (dst) ? (const char *)(dst) : "(null)", __len__);\
+        __str__[__len__] = '\0';                                        \
+    } while (0)
+#else
+#define __bch2_assign_str(dst) \
+	__assign_str(dst)
+#endif
+
 #ifndef __KERNEL__
 
 #define __bch2_bin_attribute_const const
