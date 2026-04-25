@@ -360,6 +360,8 @@ static void calculate_discard_sectors_to_release(struct btree_trans *trans)
 
 	u64 seen = s->seen - s->bad_data_type - s->not_rw;
 
+	WARN_ON_ONCE(unlikely(s->r.reserve > U64_MAX / 4));
+
 	u64 reserve_x4	= s->r.reserve * 4;
 	u64 spare_clamp	= s->r.free > reserve_x4 ? s->r.free - reserve_x4 : 0;
 
@@ -367,6 +369,12 @@ static void calculate_discard_sectors_to_release(struct btree_trans *trans)
 	s->r.buffer		= c->capacity.capacity * c->opts.journal_rewind_discard_buffer_percent / 100;
 	s->r.buffer_clamped	= min(s->r.buffer, spare_clamp);
 	s->r.release		= s->r.pending_total - s->r.buffer_clamped;
+
+	WARN_ONCE(s->r.buffer_clamped > s->r.pending_total,
+			"buffer_clamped=%llu > pending_total=%llu "
+			"(buffer=%llu spare_clamp=%llu free=%llu reserve=%llu seen=%llu)\n",
+			s->r.buffer_clamped, s->r.pending_total,
+			s->r.buffer, spare_clamp, s->r.free, s->r.reserve, seen);
 
 	if (s->r.release <= 0)
 		return;
