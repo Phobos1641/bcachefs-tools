@@ -12,6 +12,8 @@
 #include "darray.h"
 #include "printbuf.h"
 
+#include "bcachefs_glue.h"
+
 static inline unsigned __printbuf_linelen(struct printbuf *buf, unsigned pos)
 {
 	return pos - buf->last_newline;
@@ -61,7 +63,7 @@ int bch2_printbuf_make_room_gfp(struct printbuf *out, unsigned extra, gfp_t gfp)
 	 * that the user use printbuf_exit().
 	 */
 	char *buf = may_vmalloc
-		? kvrealloc(out->buf, new_size, gfp)
+		? bch2_kvrealloc(out->buf, out->size, new_size, gfp)
 		: krealloc(out->buf, new_size, !out->atomic ? gfp : GFP_NOWAIT);
 
 	if (!buf) {

@@ -311,7 +311,7 @@ int bch2_sb_realloc(struct bch_sb_handle *sb, unsigned u64s)
 	if (dynamic_fault("bcachefs:add:super_realloc"))
 		return -BCH_ERR_ENOMEM_sb_realloc_injected;
 
-	new_sb = kvrealloc(sb->sb, new_buffer_size, GFP_NOFS|__GFP_ZERO);
+	new_sb = bch2_kvrealloc(sb->sb, sb->buffer_size, new_buffer_size, GFP_NOFS|__GFP_ZERO);
 	if (!new_sb)
 		return -BCH_ERR_ENOMEM_sb_buf_realloc;
 

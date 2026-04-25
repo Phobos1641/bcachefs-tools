@@ -53,6 +53,9 @@ static inline void bch2_ratelimit_atomic_reset(struct ratelimit_state *rs)
 
 #define bch_idmap mnt_idmap
 
+#define bch2_kvrealloc(p, oldsize, newsize, flags) \
+	kvrealloc((p), (newsize), (flags))
+
 #else
 
 #include <linux/cleanup.h>
@@ -764,6 +767,21 @@ static inline void bdev_fput(struct file *bdev_file)
 	file_mnt_user_ns(_fp)
 #else
 #define bch_idmap mnt_idmap
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 12, 0)
+static inline void* bch2_kvrealloc(void *p, size_t oldsize, size_t newsize, int flags)
+{
+	void *ret = kvrealloc(p, oldsize, newsize, flags);
+
+	if (ret && newsize > oldsize)
+		memset((u8 *)ret + oldsize, 0, newsize - oldsize);
+
+	return ret;
+}
+#else
+#define bch2_kvrealloc(p, oldsize, newsize, flags) \
+	kvrealloc((p), (newsize), (flags))
 #endif
 
 #endif /* __KERNEL__ */
