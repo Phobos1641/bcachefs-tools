@@ -463,6 +463,148 @@ static inline int ida_find_first(struct ida *ida)
 #define FS_LBS 0
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 8, 0)
+#define GENRADIX_NODE_SHIFT	9
+#define GENRADIX_NODE_SIZE	(1U << GENRADIX_NODE_SHIFT)
+
+#define GENRADIX_ARY		(GENRADIX_NODE_SIZE / sizeof(struct genradix_node *))
+#define GENRADIX_ARY_SHIFT	ilog2(GENRADIX_ARY)
+
+struct genradix_node {
+	union {
+		/* Interior node: */
+		struct genradix_node	*children[GENRADIX_ARY];
+
+		/* Leaf: */
+		u8			data[GENRADIX_NODE_SIZE];
+	};
+};
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 7, 0)
+#define GENRADIX_MAX_DEPTH	\
+	DIV_ROUND_UP(BITS_PER_LONG - GENRADIX_NODE_SHIFT, GENRADIX_ARY_SHIFT)
+
+#define GENRADIX_DEPTH_MASK				\
+	((unsigned long) (roundup_pow_of_two(GENRADIX_MAX_DEPTH + 1) - 1))
+
+#define __genradix_objs_per_page(_radix)			\
+	(GENRADIX_NODE_SIZE / sizeof((_radix)->type[0]))
+
+static inline struct genradix_node *genradix_root_to_node(struct genradix_root *r)
+{
+	return (void *) ((unsigned long) r & ~GENRADIX_DEPTH_MASK);
+}
+
+static inline int genradix_depth_shift(unsigned depth)
+{
+	return GENRADIX_NODE_SHIFT + GENRADIX_ARY_SHIFT * depth;
+}
+
+static inline size_t genradix_depth_size(unsigned depth)
+{
+	return 1UL << genradix_depth_shift(depth);
+}
+
+static inline unsigned genradix_root_to_depth(struct genradix_root *r)
+{
+	return (unsigned long) r & GENRADIX_DEPTH_MASK;
+}
+
+static inline void *__genradix_iter_peek_prev(struct genradix_iter *iter,
+				struct __genradix *radix,
+				size_t objs_per_page,
+				size_t obj_size_plus_page_remainder)
+{
+	struct genradix_root *r;
+	struct genradix_node *n;
+	unsigned level, i;
+
+	if (iter->offset == SIZE_MAX)
+		return NULL;
+
+restart:
+	r = READ_ONCE(radix->root);
+	if (!r)
+		return NULL;
+
+	n	= genradix_root_to_node(r);
+	level	= genradix_root_to_depth(r);
+
+	if (ilog2(iter->offset) >= genradix_depth_shift(level)) {
+		iter->offset = genradix_depth_size(level);
+		iter->pos = (iter->offset >> GENRADIX_NODE_SHIFT) * objs_per_page;
+
+		iter->offset -= obj_size_plus_page_remainder;
+		iter->pos--;
+	}
+
+	while (level) {
+		level--;
+
+		i = (iter->offset >> genradix_depth_shift(level)) &
+			(GENRADIX_ARY - 1);
+
+		while (!n->children[i]) {
+			size_t objs_per_ptr = genradix_depth_size(level);
+
+			iter->offset = round_down(iter->offset, objs_per_ptr);
+			iter->pos = (iter->offset >> GENRADIX_NODE_SHIFT) * objs_per_page;
+
+			if (!iter->offset)
+				return NULL;
+
+			iter->offset -= obj_size_plus_page_remainder;
+			iter->pos--;
+
+			if (!i)
+				goto restart;
+			--i;
+		}
+
+		n = n->children[i];
+	}
+
+	return &n->data[iter->offset & (GENRADIX_NODE_SIZE - 1)];
+}
+
+#define genradix_iter_peek_prev(_iter, _radix)			\
+	(__genradix_cast(_radix)				\
+	 __genradix_iter_peek_prev(_iter, &(_radix)->tree,	\
+			__genradix_objs_per_page(_radix),	\
+			__genradix_obj_size(_radix) +		\
+			__genradix_page_remainder(_radix)))
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 8, 0)
+static inline void __genradix_iter_rewind(struct genradix_iter *iter,
+					  size_t obj_size)
+{
+	if (iter->offset == 0 ||
+	    iter->offset == SIZE_MAX) {
+		iter->offset = SIZE_MAX;
+		return;
+	}
+
+	if ((iter->offset & (GENRADIX_NODE_SIZE - 1)) == 0)
+		iter->offset -= GENRADIX_NODE_SIZE % obj_size;
+
+	iter->offset -= obj_size;
+	iter->pos--;
+}
+
+#define genradix_iter_rewind(_iter, _radix)			\
+	__genradix_iter_rewind(_iter, __genradix_obj_size(_radix))
+
+#define genradix_last_pos(_radix)				\
+	(SIZE_MAX / GENRADIX_NODE_SIZE * __genradix_objs_per_page(_radix) - 1)
+
+#define genradix_for_each_reverse(_radix, _iter, _p)		\
+	for (_iter = genradix_iter_init(_radix,	genradix_last_pos(_radix));\
+	     (_p = genradix_iter_peek_prev(&_iter, _radix)) != NULL;\
+	     genradix_iter_rewind(&_iter, _radix))
+#endif
+
 #endif /* __KERNEL__ */
 
 #endif /* _BCACHEFS_GLUE_H */
