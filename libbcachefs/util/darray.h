@@ -8,6 +8,7 @@
  * Inspired by CCAN's darray
  */
 
+#include <linux/version.h>
 #include <linux/cleanup.h>
 #include <linux/slab.h>
 
@@ -96,7 +97,11 @@ DEFINE_DARRAY_NAMED_FREE_ITEM(darray_const_str, const char *, kfree);
 
 int __bch2_darray_resize_noprof(darray_char *, size_t, size_t, gfp_t, bool);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,10,0)
+#define __bch2_darray_resize(...)	__bch2_darray_resize_noprof(__VA_ARGS__)
+#else
 #define __bch2_darray_resize(...)	alloc_hooks(__bch2_darray_resize_noprof(__VA_ARGS__))
+#endif
 
 #define __darray_resize(_d, _element_size, _new_size, _gfp, _rcu)	\
 	(unlikely((_new_size) > (_d)->size)				\
