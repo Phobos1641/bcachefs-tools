@@ -144,6 +144,12 @@ static inline void bch2_ratelimit_atomic_reset(struct ratelimit_state *rs)
 #define BLK_STS_INVAL ((__force blk_status_t)19)
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 9, 0)
+#define BCH_FGP_ORDER(len) 0
+#else
+#define BCH_FGP_ORDER(len) fgf_set_order(len)
+#endif
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6,9,0)
 static inline unsigned memalloc_flags_save(unsigned flags)
 {

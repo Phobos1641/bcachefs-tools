@@ -394,7 +394,7 @@ int bch2_read_single_folio(struct folio *folio, struct address_space *mapping)
 	return 0;
 }
 
-int bch2_read_folio(struct bch_file *file, struct folio *folio)
+int bch2_read_folio(struct file *file, struct folio *folio)
 {
 	int ret;
 
@@ -703,6 +703,23 @@ do_io:
 	return 0;
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
+struct bch2_writepage_iter_data {
+		struct bch_writepage_state *w;
+		struct bch_fs *c;
+		struct closure *cl;
+};
+
+static int __bch2_writepage_cb(struct folio *folio,
+			     struct writeback_control *wbc,
+			     void *data)
+{
+	struct bch2_writepage_iter_data *d = data;
+	throttle_writes(d->c, d->w->opts.data_replicas, d->cl);
+	return __bch2_writepage(folio, wbc, d->w);
+}
+#endif
+
 int bch2_writepages(struct address_space *mapping, struct writeback_control *wbc)
 {
 	struct bch_fs *c = mapping->host->i_sb->s_fs_info;
@@ -714,12 +731,22 @@ int bch2_writepages(struct address_space *mapping, struct writeback_control *wbc
 
 	CLASS(closure_stack, cl)();
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
+	struct bch2_writepage_iter_data data = {
+		.w = w,
+		.c = c,
+		.cl = &cl
+	};
+
+	int ret = write_cache_pages(mapping, wbc, __bch2_writepage_cb, &data);
+#else
 	struct folio *folio = NULL;
 	int ret = 0;
 
 	while (throttle_writes(c, w->opts.data_replicas, &cl),
 	       (folio = writeback_iter(mapping, wbc, folio, &ret)))
 		ret = __bch2_writepage(folio, wbc, w);
+#endif
 
 	if (w->io)
 		bch2_writepage_do_io(w);
@@ -731,15 +758,13 @@ int bch2_writepages(struct address_space *mapping, struct writeback_control *wbc
 
 /* buffered writes: */
 
-int bch2_write_begin(
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6,17,0)
-		     const struct kiocb *iocb,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,8,0)
+int bch2_write_begin(struct file *file, struct address_space *mapping, loff_t pos, unsigned len, struct page **pagep, void **fsdata)
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(6,17,0)
+int bch2_write_begin(struct file *file, struct address_space *mapping, loff_t pos, unsigned len, struct folio **foliop, void **fsdata)
 #else
-		     struct bch_file *file,
+int bch2_write_begin(const struct kiocb *iocb, struct address_space *mapping, loff_t pos, unsigned len, struct folio **foliop, void **fsdata)
 #endif
-		     struct address_space *mapping,
-		     loff_t pos, unsigned len,
-		     struct folio **foliop, void **fsdata)
 {
 	struct bch_inode_info *inode = to_bch_ei(mapping->host);
 	struct bch_fs *c = inode->v.i_sb->s_fs_info;
@@ -761,7 +786,7 @@ int bch2_write_begin(
 		bch2_zero_pagecache_posteof(inode);
 
 	folio = __filemap_get_folio(mapping, pos >> PAGE_SHIFT,
-				    FGP_WRITEBEGIN | fgf_set_order(len),
+				    FGP_WRITEBEGIN | BCH_FGP_ORDER(len),
 				    mapping_gfp_mask(mapping));
 	if (IS_ERR(folio))
 		goto err_unlock;
@@ -811,7 +836,11 @@ out:
 		goto err;
 	}
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 12, 0)
+	*pagep = &folio->page;
+#else
 	*foliop = folio;
+#endif
 	return 0;
 err:
 	folio_unlock(folio);
@@ -823,19 +852,21 @@ err_unlock:
 	return bch2_err_class(ret);
 }
 
-int bch2_write_end(
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6,17,0)
-		   const struct kiocb *iocb,
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,8,0)
+int bch2_write_end(struct file *file, struct address_space *mapping, loff_t pos, unsigned len, unsigned copied, struct page *page, void *fsdata)
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(6,17,0)
+int bch2_write_end(struct file *file, struct address_space *mapping, loff_t pos, unsigned len, unsigned copied, struct folio *folio, void *fsdata)
 #else
-		   struct bch_file *file,
+int bch2_write_end(const struct kiocb *iocb, struct address_space *mapping, loff_t pos, unsigned len, unsigned copied, struct folio *folio, void *fsdata)
 #endif
-		   struct address_space *mapping,
-		   loff_t pos, unsigned len, unsigned copied,
-		   struct folio *folio, void *fsdata)
 {
 	struct bch_inode_info *inode = to_bch_ei(mapping->host);
 	struct bch_fs *c = inode->v.i_sb->s_fs_info;
 	struct bch2_folio_reservation *res = fsdata;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 12, 0)
+	struct folio *folio = page_folio(page);
+#endif
 	size_t offset = pos - folio_pos(folio);
 
 	BUG_ON(offset + copied > folio_size(folio));
@@ -905,7 +936,7 @@ static int __bch2_buffered_write(struct bch_fs *c,
 	darray_init(&fs);
 
 	ret = bch2_filemap_get_contig_folios_d(mapping, pos, end,
-					       FGP_WRITEBEGIN | fgf_set_order(len),
+					       FGP_WRITEBEGIN | BCH_FGP_ORDER(len),
 					       mapping_gfp_mask(mapping), &fs);
 	if (ret)
 		goto out;
@@ -1055,7 +1086,7 @@ out:
 
 static ssize_t bch2_buffered_write(struct kiocb *iocb, struct iov_iter *iter)
 {
-	struct bch_file *file = iocb->ki_filp;
+	struct file *file = iocb->ki_filp;
 	struct address_space *mapping = file->f_mapping;
 	struct bch_inode_info *inode = file_bch_inode(file);
 	struct bch_fs *c = inode->v.i_sb->s_fs_info;
@@ -1131,7 +1162,7 @@ again:
 
 ssize_t bch2_write_iter(struct kiocb *iocb, struct iov_iter *from)
 {
-	struct bch_file *file = iocb->ki_filp;
+	struct file *file = iocb->ki_filp;
 	struct bch_inode_info *inode = file_bch_inode(file);
 	ssize_t ret;
 
