@@ -1119,6 +1119,12 @@ static inline vfsgid_t i_gid_into_vfsgid(struct user_namespace *mnt_userns,
 }
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 9, 0)
+#define BCH_FGP_ORDER(len) 0
+#else
+#define BCH_FGP_ORDER(len) fgf_set_order(len)
+#endif
+
 #endif /* __KERNEL__ */
 
 #endif /* _BCACHEFS_GLUE_H */
