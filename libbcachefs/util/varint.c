@@ -1,9 +1,14 @@
 // SPDX-License-Identifier: GPL-2.0
 
+#include <linux/version.h>
 #include <linux/bitops.h>
 #include <linux/math.h>
 #include <linux/string.h>
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 11, 0)
+#include <asm-generic/unaligned.h>
+#else
 #include <linux/unaligned.h>
+#endif
 
 #ifdef CONFIG_VALGRIND
 #include <valgrind/memcheck.h>

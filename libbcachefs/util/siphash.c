@@ -44,8 +44,13 @@
  * https://131002.net/siphash/
  */
 
+#include <linux/version.h>
 #include <asm/byteorder.h>
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 11, 0)
+#include <asm-generic/unaligned.h>
+#else
 #include <linux/unaligned.h>
+#endif
 #include <linux/bitops.h>
 #include <linux/string.h>
 
