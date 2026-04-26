@@ -394,7 +394,7 @@ int bch2_read_single_folio(struct folio *folio, struct address_space *mapping)
 	return 0;
 }
 
-int bch2_read_folio(struct file *file, struct folio *folio)
+int bch2_read_folio(struct bch_file *file, struct folio *folio)
 {
 	int ret;
 
@@ -735,7 +735,7 @@ int bch2_write_begin(
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6,17,0)
 		     const struct kiocb *iocb,
 #else
-		     struct file *file,
+		     struct bch_file *file,
 #endif
 		     struct address_space *mapping,
 		     loff_t pos, unsigned len,
@@ -827,7 +827,7 @@ int bch2_write_end(
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6,17,0)
 		   const struct kiocb *iocb,
 #else
-		   struct file *file,
+		   struct bch_file *file,
 #endif
 		   struct address_space *mapping,
 		   loff_t pos, unsigned len, unsigned copied,
@@ -1055,7 +1055,7 @@ out:
 
 static ssize_t bch2_buffered_write(struct kiocb *iocb, struct iov_iter *iter)
 {
-	struct file *file = iocb->ki_filp;
+	struct bch_file *file = iocb->ki_filp;
 	struct address_space *mapping = file->f_mapping;
 	struct bch_inode_info *inode = file_bch_inode(file);
 	struct bch_fs *c = inode->v.i_sb->s_fs_info;
@@ -1131,7 +1131,7 @@ again:
 
 ssize_t bch2_write_iter(struct kiocb *iocb, struct iov_iter *from)
 {
-	struct file *file = iocb->ki_filp;
+	struct bch_file *file = iocb->ki_filp;
 	struct bch_inode_info *inode = file_bch_inode(file);
 	ssize_t ret;
 

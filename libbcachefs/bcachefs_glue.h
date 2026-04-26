@@ -56,6 +56,17 @@ static inline void bch2_ratelimit_atomic_reset(struct ratelimit_state *rs)
 #define bch2_kvrealloc(p, oldsize, newsize, flags) \
 	kvrealloc((p), (newsize), (flags))
 
+#define bch_file file
+
+#define bch2_bdev_from_handle(_handle) \
+	file_bdev(_handle)
+
+#define bch2_bdev_file_open_by_path(_path, _mode, _holder, _hops) \
+	bdev_file_open_by_path(_path, _mode, _holder, _hops)
+
+#define bch2_bdev_release(_fp) \
+	bdev_fput((_fp))
+
 #else
 
 #include <linux/cleanup.h>
@@ -782,6 +793,80 @@ static inline void* bch2_kvrealloc(void *p, size_t oldsize, size_t newsize, int 
 #else
 #define bch2_kvrealloc(p, oldsize, newsize, flags) \
 	kvrealloc((p), (newsize), (flags))
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 9, 0)
+#define BCH_BLK_OPEN_READ	BLK_OPEN_READ
+#define BCH_BLK_OPEN_WRITE	BLK_OPEN_WRITE
+#define BCH_BLK_OPEN_EXCL	BLK_OPEN_EXCL
+
+#define bch_blk_mode_t fmode_t
+
+#define bch_file bch_file_handle
+#else
+#define BCH_BLK_OPEN_READ	FMODE_READ
+#define BCH_BLK_OPEN_WRITE	FMODE_WRITE
+#define BCH_BLK_OPEN_EXCL	FMODE_EXCL
+
+#define bch_blk_mode_t blk_mode_t
+
+#define bch_file file
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 9, 0)
+struct bch_file_handle {
+	struct block_device *bdev;
+	void *holder;
+	fmode_t mode;
+};
+
+static inline struct block_device *bch2_bdev_from_handle(struct bch_file_handle *h)
+{
+	return h->bdev;
+}
+
+#define bch2_bdev_set_file(_file_handle, _fp) \
+	((_file_handle)->bdev = _fp)
+
+static inline struct bch_file * bch2_bdev_file_open_by_path(const char *path, bch_blk_mode_t mode, void *holder, const struct blk_holder_ops *hops)
+{
+	struct bch_file_handle *h = kzalloc(sizeof(*h), GFP_KERNEL);
+	if (!h)
+		return ERR_PTR(-ENOMEM);
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 6, 0)
+	h->bdev = blkdev_get_by_path(path, mode, holder);
+#else
+	h->bdev = blkdev_get_by_path(path, mode, holder, hops);
+#endif
+	if (IS_ERR(h->bdev)) {
+		long err = PTR_ERR(h->bdev);
+		kfree(h);
+		return ERR_PTR(err);
+	}
+	h->holder = holder;
+	h->mode = mode;
+	return h;
+}
+
+static inline void bch2_bdev_release(struct bch_file_handle *h)
+{
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 6, 0)
+	blkdev_put(h->bdev, h->mode);
+#else
+	blkdev_put(h->bdev, h->holder);
+#endif
+	kfree(h);
+}
+#else
+#define bch2_bdev_from_handle(_handle) \
+	file_bdev(_handle)
+
+#define bch2_bdev_file_open_by_path(_path, _mode, _holder, _hops) \
+	bdev_file_open_by_path(_path, _mode, _holder, _hops)
+
+#define bch2_bdev_release(_fp) \
+	bdev_fput((_fp))
 #endif
 
 #endif /* __KERNEL__ */
