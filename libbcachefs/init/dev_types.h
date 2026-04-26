@@ -2,6 +2,12 @@
 #ifndef _BCACHEFS_INIT_DEV_TYPES_H
 #define _BCACHEFS_INIT_DEV_TYPES_H
 
+#include <linux/version.h>
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,5,0)
+typedef fmode_t blk_mode_t;
+#endif
+
 struct bch_fs;
 
 struct bch_sb_handle_holder {
