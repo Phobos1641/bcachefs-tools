@@ -2327,10 +2327,12 @@ got_sb:
 	sb->s_time_max		= div_s64(S64_MAX, c->sb.time_units_per_sec);
 	super_set_uuid(sb, c->sb.user_uuid.b, sizeof(c->sb.user_uuid));
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 7, 0)
 	if (c->sb.multi_device)
 		super_set_sysfs_name_uuid(sb);
 	else
 		strscpy(sb->s_sysfs_name, c->name, sizeof(sb->s_sysfs_name));
+#endif
 
 	sb->s_shrink->seeks	= 0;
 	c->vfs_sb		= sb;
