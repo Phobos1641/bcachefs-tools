@@ -1125,6 +1125,37 @@ static inline vfsgid_t i_gid_into_vfsgid(struct user_namespace *mnt_userns,
 #define BCH_FGP_ORDER(len) fgf_set_order(len)
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 7, 0)
+static inline void super_set_uuid(struct super_block *sb,
+				  const u8 *uuid, unsigned int len)
+{
+	if (WARN_ON(len > sizeof(sb->s_uuid)))
+		len = sizeof(sb->s_uuid);
+	memcpy(&sb->s_uuid, uuid, len);
+	/* s_uuid_len doesn't exist on this kernel; the full s_uuid is
+	 * the only representation. */
+}
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
+extern int generic_ci_d_hash(const struct dentry *dentry, struct qstr *str);
+extern int generic_ci_d_compare(const struct dentry *dentry, unsigned int len,
+				const char *str, const struct qstr *name);
+
+static const struct dentry_operations bch2_generic_ci_dentry_ops = {
+	.d_hash = generic_ci_d_hash,
+	.d_compare = generic_ci_d_compare,
+};
+
+static inline void generic_set_sb_d_ops(struct super_block *sb)
+{
+#ifdef CONFIG_UNICODE
+	if (sb->s_encoding)
+		sb->s_d_op = &bch2_generic_ci_dentry_ops;
+#endif
+}
+#endif
+
 #endif /* __KERNEL__ */
 
 #endif /* _BCACHEFS_GLUE_H */
