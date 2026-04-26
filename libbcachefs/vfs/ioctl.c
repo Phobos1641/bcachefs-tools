@@ -364,6 +364,67 @@ static long bch2_ioctl_subvolume_create_v2(struct bch_fs *c, struct file *filp,
 	return bch2_copy_ioctl_err_msg(&arg.err, &err, ret);
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 8, 0)
+static long __bch2_ioctl_subvolume_destroy(struct bch_fs *c, struct file *filp,
+					   struct bch_ioctl_subvolume_v2 arg,
+					   struct printbuf *err)
+{
+	const char __user *name = (void __user *)(unsigned long)arg.dst_ptr;
+	struct filename *fname;
+	struct path path;
+	struct dentry *victim;
+	struct inode *dir;
+	int ret = 0;
+
+	WARN_ON_ONCE(arg.dirfd != AT_FDCWD);
+
+	if (arg.flags)
+		return bch_err_throw(c, EINVAL_subvol_destroy_bad_flags);
+
+	fname = getname(name);
+	if (IS_ERR(fname))
+		return PTR_ERR(fname);
+
+	victim = kern_path_locked(fname->name, &path);
+	putname(fname);
+	if (IS_ERR(victim))
+		return PTR_ERR(victim);
+
+	dir = d_inode(path.dentry);
+	if (victim->d_sb->s_fs_info != c) {
+		ret = -EXDEV;
+		goto err;
+	}
+
+	inode_unlock(dir);
+	ret = mnt_want_write(path.mnt);
+	inode_lock(dir);
+	if (ret)
+		goto err;
+
+	if (d_unhashed(victim) || victim->d_parent != path.dentry) {
+		ret = -ENOENT;
+		goto err_write;
+	}
+
+	ret =   inode_permission(file_mnt_idmap(filp), d_inode(victim), MAY_WRITE) ?:
+		__bch2_unlink(dir, victim, true);
+	if (!ret) {
+		fsnotify_rmdir(dir, victim);
+		d_invalidate(victim);
+	}
+
+err_write:
+	mnt_drop_write(path.mnt);
+
+err:
+	inode_unlock(dir);
+	dput(victim);
+	path_put(&path);
+
+	return ret;
+}
+#else
 static long __bch2_ioctl_subvolume_destroy(struct bch_fs *c, struct file *filp,
 					   struct bch_ioctl_subvolume_v2 arg,
 					   struct printbuf *err)
@@ -418,6 +479,7 @@ err:
 	path_put(&path);
 	return ret;
 }
+#endif
 
 static long bch2_ioctl_subvolume_destroy(struct bch_fs *c, struct file *filp,
 					 struct bch_ioctl_subvolume arg)
