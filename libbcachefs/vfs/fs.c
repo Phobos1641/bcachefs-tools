@@ -913,6 +913,40 @@ static struct dentry *bch2_mkdir(struct mnt_idmap *idmap,
 	return ERR_PTR(bch2_mknod(idmap, vdir, dentry, mode|S_IFDIR, 0));
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 15, 0)
+/*
+ * Compat thunk: bcachefs's bch2_mkdir currently only ever returns NULL
+ * (success, dentry already instantiated by bch2_mknod) or ERR_PTR(-errno).
+ */
+static inline int bch2_mkdir_compat(struct mnt_idmap *idmap,
+                                    struct inode *dir,
+                                    struct dentry *dentry,
+                                    umode_t mode)
+{
+    struct dentry *ret = bch2_mkdir(idmap, dir, dentry, mode);
+
+    if (IS_ERR(ret))
+        return PTR_ERR(ret);
+
+    /* Filesystem returned a replacement dentry. The new VFS would splice it in
+     * via the return path; on the old VFS we have to do it manually here using
+     * d_splice_alias. */
+    if (ret) {
+        struct dentry *spliced = d_splice_alias(d_inode(ret), dentry);
+        dput(ret);
+        if (IS_ERR(spliced))
+            return PTR_ERR(spliced);
+        if (spliced)
+            dput(spliced);  /* old contract doesn't return the dentry; reference is held by dcache */
+    }
+    return 0;
+}
+
+#define BCH2_MKDIR_OP  bch2_mkdir_compat
+#else
+#define BCH2_MKDIR_OP  bch2_mkdir
+#endif
+
 static int bch2_rename2(struct mnt_idmap *idmap,
 			struct inode *src_vdir, struct dentry *src_dentry,
 			struct inode *dst_vdir, struct dentry *dst_dentry,
@@ -1482,7 +1516,7 @@ static const struct inode_operations bch_dir_inode_operations = {
 	.link		= bch2_link,
 	.unlink		= bch2_unlink,
 	.symlink	= bch2_symlink,
-	.mkdir		= bch2_mkdir,
+	.mkdir		= BCH2_MKDIR_OP,
 	.rmdir		= bch2_unlink,
 	.mknod		= bch2_mknod,
 	.rename		= bch2_rename2,
