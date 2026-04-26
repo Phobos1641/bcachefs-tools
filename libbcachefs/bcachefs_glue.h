@@ -46,6 +46,15 @@ static inline void bch2_ratelimit_atomic_reset(struct ratelimit_state *rs)
 #endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 7, 0)
+#define FILEID_BCACHEFS_WITH_PARENT 0xb2
+#define FILEID_BCACHEFS_WITHOUT_PARENT 0xb1
+#endif
+
+#ifndef BCACHEFS_SUPER_MAGIC
+#define BCACHEFS_SUPER_MAGIC	0xca451a4e
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 7, 0)
 struct bch_shrinker_wrap {
 	struct shrinker sh;		/* kernel's real shrinker -- this *must* be first */
 	char name[64];
