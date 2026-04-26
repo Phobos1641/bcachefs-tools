@@ -1576,7 +1576,11 @@ static const struct address_space_operations bch_address_space_operations = {
 #ifdef CONFIG_MIGRATION
 	.migrate_folio	= filemap_migrate_folio,
 #endif
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,8,0)
+	.error_remove_page = generic_error_remove_page,
+#else
 	.error_remove_folio = generic_error_remove_folio,
+#endif
 };
 
 struct bcachefs_fid {
