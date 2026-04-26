@@ -2334,7 +2334,7 @@ got_sb:
 		strscpy(sb->s_sysfs_name, c->name, sizeof(sb->s_sysfs_name));
 #endif
 
-	sb->s_shrink->seeks	= 0;
+	bch2_shrinker_set_seeks(sb->s_shrink, 0);
 	c->vfs_sb		= sb;
 	strscpy(sb->s_id, c->name, sizeof(sb->s_id));
 
@@ -2360,7 +2360,7 @@ got_sb:
 	if (c->opts.acl)
 		sb->s_flags	|= SB_POSIXACL;
 
-	sb->s_shrink->seeks = 0;
+	bch2_shrinker_set_seeks(sb->s_shrink, 0);
 
 #if IS_ENABLED(CONFIG_UNICODE)
 	if (!bch2_fs_casefold_enabled(c))
