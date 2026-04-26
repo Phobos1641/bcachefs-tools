@@ -1250,11 +1250,18 @@ static int bch2_fs_init(struct bch_fs *c, struct bch_sb *sb,
 	bch2_opts_apply(&c->opts, *opts);
 
 #ifdef __KERNEL__
+	#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 12, 0)
+	if (c->opts.block_size > PAGE_SIZE) {
+		prt_printf(out, "cannot mount bs > ps filesystem on kernels older than 6.12\n");
+		return bch_err_throw(c, EINVAL_block_size_needs_thp);
+	}
+	#else
 	if (!IS_ENABLED(CONFIG_TRANSPARENT_HUGEPAGE) &&
 	    c->opts.block_size > PAGE_SIZE) {
 		prt_printf(out, "cannot mount bs > ps filesystem without CONFIG_TRANSPARENT_HUGEPAGE\n");
 		return bch_err_throw(c, EINVAL_block_size_needs_thp);
 	}
+	#endif
 #endif
 
 	c->block_bits		= ilog2(block_sectors(c));
