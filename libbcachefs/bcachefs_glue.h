@@ -875,6 +875,10 @@ static inline void bch2_bdev_release(struct bch_file_handle *h)
 #endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 12, 0)
+static inline void mapping_set_folio_min_order(struct address_space *mapping, unsigned int min_order)
+{
+}
+
 static inline unsigned int mapping_min_folio_order(const struct address_space *mapping)
 {
 	return 0;
