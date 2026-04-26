@@ -38,7 +38,12 @@
  * - xxHash source repository: https://github.com/Cyan4973/xxHash
  */
 
+#include <linux/version.h>
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 11, 0)
+#include <asm-generic/unaligned.h>
+#else
 #include <linux/unaligned.h>
+#endif
 #include <linux/errno.h>
 #include <linux/compiler.h>
 #include <linux/kernel.h>

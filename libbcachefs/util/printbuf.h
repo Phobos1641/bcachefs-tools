@@ -63,7 +63,10 @@
  * human readable bytes. prt_units() obeys it.
  */
 
+#include <linux/version.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6,4,0)
 #include <linux/hex.h>
+#endif
 #include <linux/kernel.h>
 #include <linux/string.h>
 

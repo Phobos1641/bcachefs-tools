@@ -14,7 +14,11 @@
 #include "init/error.h"
 #include "init/passes.h"
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 5, 0)
+#include <linux/string_helpers.h>
+#else
 #include <linux/string_choices.h>
+#endif
 
 #ifdef __KERNEL__
 

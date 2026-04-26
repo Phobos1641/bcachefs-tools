@@ -92,8 +92,11 @@
 
 #include "util/eytzinger.h"
 #include "util/util.h"
-
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 11, 0)
+#include <asm-generic/unaligned.h>
+#else
 #include <linux/unaligned.h>
+#endif
 #include <linux/console.h>
 #include <linux/random.h>
 #include <linux/prefetch.h>

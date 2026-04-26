@@ -5,9 +5,14 @@
 #ifndef _CRYPTO_CHACHA20_H
 #define _CRYPTO_CHACHA20_H
 
+#include <linux/version.h>
 #include <linux/types.h>
 #include <linux/crypto.h>
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 11, 0)
+#include <asm-generic/unaligned.h>
+#else
 #include <linux/unaligned.h>
+#endif
 
 #define CHACHA_IV_SIZE	16
 #define CHACHA_KEY_SIZE	32
