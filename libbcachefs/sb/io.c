@@ -269,7 +269,7 @@ void bch2_free_super(struct bch_sb_handle *sb)
 {
 	kfree(sb->bio);
 	if (!IS_ERR_OR_NULL(sb->s_bdev_file))
-		bdev_fput(sb->s_bdev_file);
+		bch2_bdev_release(sb->s_bdev_file);
 	kfree(sb->holder);
 	kfree(sb->sb_name);
 
@@ -872,13 +872,13 @@ static int read_super_and_backups(struct bch_sb_handle *sb,
 	if (!opt_get(*opts, nochanges))
 		sb->mode |= BLK_OPEN_WRITE;
 
-	sb->s_bdev_file = bdev_file_open_by_path(path, sb->mode, sb->holder, &bch2_sb_handle_bdev_ops);
+	sb->s_bdev_file = bch2_bdev_file_open_by_path(path, sb->mode, sb->holder, &bch2_sb_handle_bdev_ops);
 	if (IS_ERR(sb->s_bdev_file) &&
 	    PTR_ERR(sb->s_bdev_file) == -EACCES &&
 	    opt_get(*opts, read_only)) {
 		sb->mode &= ~BLK_OPEN_WRITE;
 
-		sb->s_bdev_file = bdev_file_open_by_path(path, sb->mode, sb->holder, &bch2_sb_handle_bdev_ops);
+		sb->s_bdev_file = bch2_bdev_file_open_by_path(path, sb->mode, sb->holder, &bch2_sb_handle_bdev_ops);
 		if (!IS_ERR(sb->s_bdev_file))
 			opt_set(*opts, nochanges, true);
 	}
@@ -886,7 +886,7 @@ static int read_super_and_backups(struct bch_sb_handle *sb,
 	if (IS_ERR(sb->s_bdev_file))
 		return PTR_ERR(sb->s_bdev_file);
 
-	sb->bdev = file_bdev(sb->s_bdev_file);
+	sb->bdev = bch2_bdev_from_handle(sb->s_bdev_file);
 
 	try(bch2_sb_realloc(sb, 0));
 

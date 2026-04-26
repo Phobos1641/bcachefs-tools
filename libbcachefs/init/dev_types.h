@@ -16,7 +16,7 @@ struct bch_sb_handle_holder {
 
 struct bch_sb_handle {
 	struct bch_sb		*sb;
-	struct file		*s_bdev_file;
+	struct bch_file		*s_bdev_file;
 	struct block_device	*bdev;
 	char			*sb_name;
 	struct bio		*bio;

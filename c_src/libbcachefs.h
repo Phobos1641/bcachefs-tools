@@ -38,7 +38,7 @@ struct format_opts {
 };
 
 struct dev_opts {
-	struct file	*file;
+	struct bch_file	*file;
 	struct block_device *bdev;
 	const char	*path;
 

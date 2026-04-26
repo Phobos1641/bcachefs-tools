@@ -14,7 +14,7 @@ struct seq_file {
 	loff_t read_pos;
 	u64 version;
 	int poll_event;
-	const struct file *file;
+	const struct bch_file *file;
 	void *private;
 };
 
