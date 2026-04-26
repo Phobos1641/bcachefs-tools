@@ -7,6 +7,8 @@
 
 #include "vendor/bio_iov_iter.h"
 
+#include "bcachefs_glue.h"
+
 static inline bool bio_full(struct bio *bio, unsigned len)
 {
 	if (bio->bi_vcnt >= bio->bi_max_vecs)
