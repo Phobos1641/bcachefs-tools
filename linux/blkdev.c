@@ -94,11 +94,11 @@ static atomic_t running_requests;
 
 void generic_make_request(struct bio *bio)
 {
-	struct iovec *iov;
+	struct iovec *iov = NULL;
 	struct bvec_iter iter;
 	struct bio_vec bv;
 	ssize_t ret;
-	unsigned i;
+	unsigned i = 0;
 
 	if (bio->bi_opf & REQ_PREFLUSH) {
 		ret = fdatasync(bio->bi_bdev->bd_fd);
@@ -278,7 +278,7 @@ struct file *bdev_file_open_by_path(const char *path, blk_mode_t mode,
 
 	/* strip directory */
 
-	char *fname = strrchr(path, '/');
+	const char *fname = strrchr(path, '/');
 
 	strncpy(bdev->name, fname ? fname + 1 : path, sizeof(bdev->name));
 	bdev->name[sizeof(bdev->name) - 1] = '\0';
