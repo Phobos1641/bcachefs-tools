@@ -1156,6 +1156,14 @@ static inline void generic_set_sb_d_ops(struct super_block *sb)
 }
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 7, 0)
+#define bch2_shrinker_set_seeks(_shrinker, _value) \
+	(((_shrinker).seeks) = (_value))
+#else
+#define bch2_shrinker_set_seeks(_shrinker, _value) \
+	(((_shrinker)->seeks) = (_value))
+#endif
+
 #endif /* __KERNEL__ */
 
 #endif /* _BCACHEFS_GLUE_H */
