@@ -1204,8 +1204,10 @@ static int bch2_getattr(struct bch_idmap *idmap,
 	stat->blksize	= block_bytes(c);
 	stat->blocks	= inode->v.i_blocks;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
 	stat->subvol	= inode->ei_inum.subvol;
 	stat->result_mask |= STATX_SUBVOL;
+#endif
 
 	if ((request_mask & STATX_DIOALIGN) && S_ISREG(inode->v.i_mode)) {
 		stat->result_mask |= STATX_DIOALIGN;
