@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 #ifndef NO_BCACHEFS_FS
 
+#include <linux/version.h>
 #include <linux/blkdev.h>
 #include <linux/uio.h>
 
@@ -53,6 +54,7 @@ static unsigned int get_contig_folio_len(unsigned int *num_pages,
 	return contig_sz;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
 static int __bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 {
 	iov_iter_extraction_t extraction_flags = 0;
@@ -126,6 +128,7 @@ out:
 
 	return ret;
 }
+#endif
 
 /*
  * Aligns the bio size to the len_align_mask, releasing excessive bio vecs that
@@ -185,6 +188,11 @@ int bch2_bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter,
 		return 0;
 	}
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 6, 0)
+	/* Not supported, emit warning if len_align_mask != 0 */
+	WARN_ON_ONCE(len_align_mask);
+	return bio_iov_iter_get_pages(bio, iter);
+#else
 	if (iov_iter_extract_will_pin(iter))
 		bio_set_flag(bio, BIO_PAGE_PINNED);
 	do {
@@ -194,6 +202,7 @@ int bch2_bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter,
 	if (bio->bi_vcnt)
 		return bio_iov_iter_align_down(bio, iter, len_align_mask);
 	return ret;
+#endif
 }
 
 #endif /* NO_BCACHEFS_FS */
