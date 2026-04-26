@@ -14,11 +14,19 @@ struct bkey_buf {
 
 static inline int bch2_bkey_buf_realloc_noprof(struct bkey_buf *s, unsigned u64s)
 {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,10,0)
+	if (s->k == (void *) s->onstack &&
+	    u64s > ARRAY_SIZE(s->onstack)) {
+		s->k = kmalloc(2048, GFP_KERNEL|__GFP_NOFAIL);
+		memcpy(s->k, s->onstack, sizeof(s->onstack));
+	}
+#else
 	if (s->k == (void *) s->onstack &&
 	    u64s > ARRAY_SIZE(s->onstack)) {
 		s->k = kmalloc_noprof(2048, GFP_KERNEL|__GFP_NOFAIL);
 		memcpy(s->k, s->onstack, sizeof(s->onstack));
 	}
+#endif
 
 	return 0; /* for alloc_hooks() macro */
 }
