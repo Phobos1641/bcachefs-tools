@@ -367,7 +367,7 @@ static ssize_t bch2_cached_btree_nodes_read(struct file *file, char __user *buf,
 {
 	struct dump_iter *i = file->private_data;
 	struct bch_fs *c = i->c;
-	bool done = false;
+	bool finished = false;
 	ssize_t ret = 0;
 
 	i->ubuf = buf;
@@ -390,10 +390,10 @@ static ssize_t bch2_cached_btree_nodes_read(struct file *file, char __user *buf,
 					bch2_cached_btree_node_to_text(&i->buf, c, b);
 				i->iter++;
 			} else {
-				done = true;
+				finished = true;
 			}
 		}
-	} while (!done);
+	} while (!finished);
 
 	if (i->buf.allocation_failure)
 		ret = -ENOMEM;
