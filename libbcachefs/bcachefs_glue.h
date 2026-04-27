@@ -54,6 +54,10 @@ static inline void bch2_ratelimit_atomic_reset(struct ratelimit_state *rs)
 #define BCACHEFS_SUPER_MAGIC	0xca451a4e
 #endif
 
+#ifndef cmp_int
+#define cmp_int(l ,r) (((l) > (r)) - ((l) < (r)))
+#endif
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 7, 0)
 struct bch_shrinker_wrap {
 	struct shrinker sh;		/* kernel's real shrinker -- this *must* be first */
