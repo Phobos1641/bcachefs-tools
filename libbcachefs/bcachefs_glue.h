@@ -99,6 +99,10 @@ static __maybe_unused const bool class_##_name##_is_conditional = _is_cond
     sort_r(base, num, size, cmp, swap, priv)
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 7, 0)
+DEFINE_FREE(kvfree, void *, if (_T) kvfree(_T))
+#endif
+
 #ifndef this_cpu_try_cmpxchg
 #define this_cpu_try_cmpxchg(pcp, oldp, new)            \
 ({                                                      \
