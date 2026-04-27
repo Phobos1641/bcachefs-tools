@@ -26,6 +26,8 @@
 #include "darray.h"
 #include "time_stats.h"
 
+#include "bcachefs_glue.h"
+
 struct closure;
 
 #ifdef CONFIG_BCACHEFS_DEBUG

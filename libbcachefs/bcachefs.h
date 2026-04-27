@@ -54,6 +54,8 @@
 #include <linux/zstd.h>
 #include <linux/unicode.h>
 
+#include "bcachefs_glue.h"
+
 #include "bcachefs_format.h"
 #include "errcode.h"
 #include "opts.h"
