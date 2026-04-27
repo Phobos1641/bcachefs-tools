@@ -990,6 +990,20 @@ static inline struct timespec64 inode_get_ctime(const struct inode *inode)
 }
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 0, 0)
+static inline vfsuid_t i_uid_into_vfsuid(struct user_namespace *mnt_userns,
+			const struct inode *inode)
+{
+	return VFSUIDT_INIT(i_uid_into_mnt(mnt_userns, inode));
+}
+
+static inline vfsgid_t i_gid_into_vfsgid(struct user_namespace *mnt_userns,
+			const struct inode *inode)
+{
+	return VFSGIDT_INIT(i_gid_into_mnt(mnt_userns, inode));
+}
+#endif
+
 #endif /* __KERNEL__ */
 
 #endif /* _BCACHEFS_GLUE_H */
