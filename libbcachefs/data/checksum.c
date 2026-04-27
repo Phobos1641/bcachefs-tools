@@ -103,7 +103,7 @@ static void bch2_chacha20_init(struct chacha_state *state,
 	le32_to_cpu_array(key_words, ARRAY_SIZE(key_words));
 
 	BUILD_BUG_ON(sizeof(nonce) != CHACHA_IV_SIZE);
-	chacha_init(state, key_words, (const u8 *)nonce.d);
+	bch2_chacha_init(state, key_words, (const u8 *)nonce.d);
 
 	memzero_explicit(key_words, sizeof(key_words));
 }
@@ -114,8 +114,8 @@ void bch2_chacha20(const struct bch_key *key, struct nonce nonce,
 	struct chacha_state state;
 
 	bch2_chacha20_init(&state, key, nonce);
-	chacha20_crypt(&state, data, data, len);
-	chacha_zeroize_state(&state);
+	bch2_chacha20_crypt(&state, data, data, len);
+	bch2_chacha_zeroize_state(&state);
 }
 
 static void bch2_poly1305_init(struct poly1305_desc_ctx *desc,
@@ -279,10 +279,10 @@ int __bch2_encrypt_bio(struct bch_fs *c, unsigned type,
 		}
 
 		p = bvec_kmap_local(&bv);
-		chacha20_crypt(&chacha_state, p, p, bv.bv_len);
+		bch2_chacha20_crypt(&chacha_state, p, p, bv.bv_len);
 		kunmap_local(p);
 	}
-	chacha_zeroize_state(&chacha_state);
+	bch2_chacha_zeroize_state(&chacha_state);
 	return ret;
 }
 

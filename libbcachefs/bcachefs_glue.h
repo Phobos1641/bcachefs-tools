@@ -24,6 +24,10 @@ static inline void bch2_ratelimit_atomic_reset(struct ratelimit_state *rs)
     atomic_set(&rs->missed,    0);
 }
 
+#define bch2_chacha_init(_state, _key, _iv)				chacha_init(_state, _key, _iv)
+#define bch2_chacha20_crypt(_state, _dst, _src, _bytes)	chacha20_crypt(_state, _dst, _src, _bytes)
+#define bch2_chacha_zeroize_state(_state)				chacha_zeroize_state(_state)
+
 #else
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 7, 0)
@@ -77,6 +81,48 @@ static inline void bch2_ratelimit_atomic_reset(struct ratelimit_state *rs)
 {
 	atomic_set(&rs->rs_n_left, 0);
 	atomic_set(&rs->missed,    0);
+}
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 17, 0)
+struct chacha_state {
+	u32 x[16];
+};
+
+static inline void bch2_chacha_init(struct chacha_state *state,
+                                    const u32 *key, const u8 *iv)
+{
+	chacha_init(state->x, key, iv);
+}
+
+static inline void bch2_chacha20_crypt(struct chacha_state *state,
+			u8 *dst, const u8 *src,
+			unsigned int bytes)
+{
+	chacha20_crypt(state->x, dst, src, bytes);
+}
+
+static inline void bch2_chacha_zeroize_state(struct chacha_state *state)
+{
+	memzero_explicit(state->x, sizeof(state->x));
+}
+#else
+static inline void bch2_chacha_init(struct chacha_state *state,
+			const u32 *key, const u8 *iv)
+{
+	chacha_init(state, key, iv);
+}
+
+static inline void bch2_chacha20_crypt(struct chacha_state *state,
+			u8 *dst, const u8 *src,
+			unsigned int bytes)
+{
+	chacha20_crypt(state, dst, src, bytes);
+}
+
+static inline void bch2_chacha_zeroize_state(struct chacha_state *state)
+{
+	chacha_zeroize_state(state);
 }
 #endif
 
