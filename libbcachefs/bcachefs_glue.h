@@ -67,6 +67,20 @@ static inline void bch2_ratelimit_atomic_reset(struct ratelimit_state *rs)
 #define alloc_hooks(expr) (expr)
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,9,0)
+static inline unsigned memalloc_flags_save(unsigned flags)
+{
+	unsigned oldflags = ~current->flags & flags;
+	current->flags |= flags;
+	return oldflags;
+}
+
+static inline void memalloc_flags_restore(unsigned flags)
+{
+	current->flags &= ~flags;
+}
+#endif
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 4, 0)
 static inline void mm_account_reclaimed_pages(unsigned long pages)
 {
