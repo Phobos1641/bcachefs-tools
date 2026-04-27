@@ -23,9 +23,14 @@
  * probability of all 3 slots occupied is ~(16/512)^3 ≈ 0.003%.
  */
 
+#include <linux/version.h>
 #include <linux/hash.h>
 #include <linux/random.h>
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 7, 0)
+#include "vendor/closure.h"
+#else
 #include <linux/closure.h>
+#endif
 
 #define FDM_NR_HASH		3
 #define FDM_HASH_BITS		9
