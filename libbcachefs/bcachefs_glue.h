@@ -874,6 +874,13 @@ static inline void bch2_bdev_release(struct bch_file_handle *h)
 #define bdev_thaw thaw_bdev
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 12, 0)
+static inline unsigned int mapping_min_folio_order(const struct address_space *mapping)
+{
+	return 0;
+}
+#endif
+
 #endif /* __KERNEL__ */
 
 #endif /* _BCACHEFS_GLUE_H */
