@@ -329,6 +329,18 @@ static inline bool bio_add_vmalloc(struct bio *bio, void *vaddr, unsigned int le
 #define QSTR(n) (struct qstr)QSTR_INIT(n, strlen(n))
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 14, 0)
+static const struct constant_table bool_names[] = {
+	{ "0",		false },
+	{ "1",		true },
+	{ "false",	false },
+	{ "no",		false },
+	{ "true",	true },
+	{ "yes",	true },
+	{ },
+};
+#endif
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 15, 0)
 static inline int ida_find_first_range(struct ida *ida, unsigned int min, unsigned int max)
 {
