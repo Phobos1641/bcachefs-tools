@@ -308,6 +308,34 @@ static inline void bch2_bio_add_virt_nofail(struct bio *bio, void *vaddr, unsign
 	bio_add_virt_nofail(_bio, _vaddr, _len)
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 16, 0)
+static inline unsigned int bio_add_vmalloc_chunk(struct bio *bio, void *vaddr, unsigned len)
+{
+	unsigned int offset = offset_in_page(vaddr);
+
+	len = min(len, PAGE_SIZE - offset);
+	if (bio_add_page(bio, vmalloc_to_page(vaddr), len, offset) < len)
+		return 0;
+	if (op_is_write(bio_op(bio)))
+		flush_kernel_vmap_range(vaddr, len);
+	return len;
+}
+
+static inline bool bio_add_vmalloc(struct bio *bio, void *vaddr, unsigned int len)
+{
+	do {
+		unsigned int added = bio_add_vmalloc_chunk(bio, vaddr, len);
+
+		if (!added)
+			return false;
+		vaddr += added;
+		len -= added;
+	} while (len);
+
+	return true;
+}
+#endif
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 15, 0)
 static inline int ida_find_first_range(struct ida *ida, unsigned int min, unsigned int max)
 {
