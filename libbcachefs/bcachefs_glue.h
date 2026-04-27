@@ -93,6 +93,18 @@ static inline void bch2_ratelimit_atomic_reset(struct ratelimit_state *rs)
 #define alloc_hooks(expr) (expr)
 #endif
 
+#ifndef BLK_STS_RESV_CONFLICT
+#define BLK_STS_RESV_CONFLICT ((__force blk_status_t)6)
+#endif
+
+#ifndef BLK_STS_DURATION_LIMIT
+#define BLK_STS_DURATION_LIMIT ((__force blk_status_t)17)
+#endif
+
+#ifndef BLK_STS_INVAL
+#define BLK_STS_INVAL ((__force blk_status_t)19)
+#endif
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6,9,0)
 static inline unsigned memalloc_flags_save(unsigned flags)
 {
