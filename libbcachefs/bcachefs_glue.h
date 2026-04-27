@@ -117,6 +117,11 @@ static inline void bch2_ratelimit_atomic_reset(struct ratelimit_state *rs)
 #define alloc_hooks(expr) (expr)
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 11, 0)
+#define lockdep_set_notrack_class(_lock) \
+	lockdep_set_novalidate_class(_lock)
+#endif
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6,9,0)
 static inline unsigned memalloc_flags_save(unsigned flags)
 {
