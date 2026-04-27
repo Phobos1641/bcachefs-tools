@@ -932,6 +932,15 @@ static inline void inode_wake_up_bit(struct inode *inode, u32 bit)
 }
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 7, 0)
+static inline void folio_end_read(struct folio *folio, bool success)
+{
+	if (likely(success))
+		folio_mark_uptodate(folio);
+	folio_unlock(folio);
+}
+#endif
+
 #endif /* __KERNEL__ */
 
 #endif /* _BCACHEFS_GLUE_H */
