@@ -973,6 +973,23 @@ static inline void folio_end_read(struct folio *folio, bool success)
 }
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 6, 10)
+static inline struct timespec64 inode_get_atime(const struct inode *inode)
+{
+	return inode->i_atime;
+}
+
+static inline struct timespec64 inode_get_mtime(const struct inode *inode)
+{
+	return inode->i_mtime;
+}
+
+static inline struct timespec64 inode_get_ctime(const struct inode *inode)
+{
+	return inode->i_ctime;
+}
+#endif
+
 #endif /* __KERNEL__ */
 
 #endif /* _BCACHEFS_GLUE_H */
