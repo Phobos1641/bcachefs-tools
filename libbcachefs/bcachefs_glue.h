@@ -17,6 +17,14 @@
 #define __force
 #endif
 
+#ifndef QSTR_INIT
+#define QSTR_INIT(n,l) { { { .len = l } }, .name = n }
+#endif
+
+#ifndef QSTR
+#define QSTR(n) (struct qstr)QSTR_INIT(n, strlen(n))
+#endif
+
 #ifndef __KERNEL__
 
 #define __bch2_bin_attribute_const const
