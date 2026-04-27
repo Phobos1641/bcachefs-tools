@@ -33,6 +33,10 @@ static inline void bch2_ratelimit_atomic_reset(struct ratelimit_state *rs)
 
 #else
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 8, 0)
+#define MAX_PAGE_ORDER MAX_ORDER
+#endif
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 7, 0)
 struct bch_shrinker_wrap {
 	struct shrinker sh;		/* kernel's real shrinker -- this *must* be first */
