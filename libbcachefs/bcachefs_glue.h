@@ -3,6 +3,7 @@
 
 #include <linux/version.h>
 #include <linux/compiler.h>
+#include <linux/ratelimit.h>
 
 #ifndef __counted_by
 	#define __counted_by(nr)
@@ -16,6 +17,12 @@
 
 #define bch2_shrinker_get_private(_s)           ((_s)->private_data)
 #define bch2_shrinker_set_private(_s, _priv)    ((_s)->private_data) = _priv;
+
+static inline void bch2_ratelimit_atomic_reset(struct ratelimit_state *rs)
+{
+    atomic_set(&rs->rs_n_left, 0);
+    atomic_set(&rs->missed,    0);
+}
 
 #else
 
@@ -52,6 +59,24 @@ static inline void bch2_shrinker_set_private(struct shrinker *_s, void *priv)
 static inline void bch2_shrinker_set_private(struct shrinker *_s, void *priv)
 {
     _s->private_data = priv;
+}
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 16, 0)
+static inline void bch2_ratelimit_atomic_reset(struct ratelimit_state *rs)
+{
+	unsigned long flags;
+	raw_spin_lock_irqsave(&rs->lock, flags);
+	rs->printed = 0;
+	rs->missed  = 0;
+	rs->begin   = jiffies;
+	raw_spin_unlock_irqrestore(&rs->lock, flags);
+}
+#else
+static inline void bch2_ratelimit_atomic_reset(struct ratelimit_state *rs)
+{
+	atomic_set(&rs->rs_n_left, 0);
+	atomic_set(&rs->missed,    0);
 }
 #endif
 
