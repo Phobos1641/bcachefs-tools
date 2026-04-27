@@ -1264,6 +1264,23 @@ static inline void bch2_iget(struct inode *inode)
 #define bch2_iget(_inode) __iget(_inode)
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 12, 0)
+static inline const char *errname(int err)
+{
+	if (err >= 0)
+		return NULL;
+
+	switch (err) {
+	case -EPERM:    return "EPERM";
+	case -ENOENT:   return "ENOENT";
+	case -ESRCH:    return "ESRCH";
+	case -EINTR:    return "EINTR";
+	case -EIO:      return "EIO";
+	default:        return "<unknown error>";
+	}
+}
+#endif
+
 #endif /* __KERNEL__ */
 
 #endif /* _BCACHEFS_GLUE_H */
