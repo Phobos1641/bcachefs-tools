@@ -803,7 +803,7 @@ void bch2_btree_key_cache_drop(struct btree_trans *trans,
 static unsigned long bch2_btree_key_cache_scan(struct shrinker *shrink,
 					   struct shrink_control *sc)
 {
-	struct bch_fs *c = shrink->private_data;
+	struct bch_fs *c = bch2_shrinker_get_private(shrink);
 	struct bch_fs_btree_key_cache *bc = &c->btree.key_cache;
 	struct bucket_table *tbl;
 	struct bkey_cached *ck;
@@ -878,7 +878,7 @@ out:
 static unsigned long bch2_btree_key_cache_count(struct shrinker *shrink,
 					    struct shrink_control *sc)
 {
-	struct bch_fs *c = shrink->private_data;
+	struct bch_fs *c = bch2_shrinker_get_private(shrink);
 	struct bch_fs_btree_key_cache *bc = &c->btree.key_cache;
 	long nr = atomic_long_read(&bc->nr_keys) -
 		atomic_long_read(&bc->nr_dirty);
@@ -977,7 +977,7 @@ int bch2_fs_btree_key_cache_init(struct bch_fs_btree_key_cache *bc)
 	shrink->scan_objects	= bch2_btree_key_cache_scan;
 	shrink->batch		= 1 << 14;
 	shrink->seeks		= 0;
-	shrink->private_data	= c;
+	bch2_shrinker_set_private(shrink, c);
 	shrinker_register(shrink);
 	return 0;
 }
