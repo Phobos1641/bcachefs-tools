@@ -91,6 +91,14 @@ static __maybe_unused const bool class_##_name##_is_conditional = _is_cond
 	{ return (void *)1; }
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 15, 0)
+#define sort_nonatomic(base, num, size, cmp, swap)  \
+    sort(base, num, size, cmp, swap)
+
+#define sort_r_nonatomic(base, num, size, cmp, swap, priv)  \
+    sort_r(base, num, size, cmp, swap, priv)
+#endif
+
 #ifndef this_cpu_try_cmpxchg
 #define this_cpu_try_cmpxchg(pcp, oldp, new)            \
 ({                                                      \
