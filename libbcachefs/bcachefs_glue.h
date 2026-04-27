@@ -293,6 +293,49 @@ static inline void bch2_bio_add_virt_nofail(struct bio *bio, void *vaddr, unsign
 #define BLK_STS_INVAL           ((__force blk_status_t)19)
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 2, 0)
+static inline const char *blk_status_to_str(blk_status_t status)
+{
+    static const struct {
+        int errno;
+        const char *name;
+    } bch2_blk_errors[] = {
+	[BLK_STS_OK]		= { 0,		"" },
+	[BLK_STS_NOTSUPP]	= { -EOPNOTSUPP, "operation not supported" },
+	[BLK_STS_TIMEOUT]	= { -ETIMEDOUT,	"timeout" },
+	[BLK_STS_NOSPC]		= { -ENOSPC,	"critical space allocation" },
+	[BLK_STS_TRANSPORT]	= { -ENOLINK,	"recoverable transport" },
+	[BLK_STS_TARGET]	= { -EREMOTEIO,	"critical target" },
+	[BLK_STS_RESV_CONFLICT]	= { -EBADE,	"reservation conflict" },
+	[BLK_STS_MEDIUM]	= { -ENODATA,	"critical medium" },
+	[BLK_STS_PROTECTION]	= { -EILSEQ,	"protection" },
+	[BLK_STS_RESOURCE]	= { -ENOMEM,	"kernel resource" },
+	[BLK_STS_DEV_RESOURCE]	= { -EBUSY,	"device resource" },
+	[BLK_STS_AGAIN]		= { -EAGAIN,	"nonblocking retry" },
+	[BLK_STS_OFFLINE]	= { -ENODEV,	"device offline" },
+
+	/* device mapper special case, should not leak out: */
+	[BLK_STS_DM_REQUEUE]	= { -EREMCHG, "dm internal retry" },
+
+	/* zone device specific errors */
+	[BLK_STS_ZONE_OPEN_RESOURCE]	= { -ETOOMANYREFS, "open zones exceeded" },
+	[BLK_STS_ZONE_ACTIVE_RESOURCE]	= { -EOVERFLOW, "active zones exceeded" },
+
+	/* Command duration limit device-side timeout */
+	[BLK_STS_DURATION_LIMIT]	= { -ETIME, "duration limit exceeded" },
+
+	[BLK_STS_INVAL]		= { -EINVAL,	"invalid" },
+
+	/* everything else not covered above: */
+	[BLK_STS_IOERR]		= { -EIO,	"I/O" },
+    };
+    unsigned int idx = (unsigned int)status;
+    if (idx >= ARRAY_SIZE(bch2_blk_errors) || !bch2_blk_errors[idx].name)
+        return "<null>";
+    return bch2_blk_errors[idx].name;
+}
+#endif
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 16, 0)
 static inline unsigned int bio_add_vmalloc_chunk(struct bio *bio, void *vaddr, unsigned len)
 {
