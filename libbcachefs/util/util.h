@@ -75,7 +75,11 @@ static inline size_t buf_nr_bvecs(void *p, size_t len)
 
 static inline void *bch2_kvmalloc_noprof(size_t n, gfp_t flags)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6,18,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,10,0)
+	void *p = unlikely(n >= INT_MAX)
+		? vmalloc(n)
+		: kvmalloc(n, flags & ~__GFP_ZERO);
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(6,18,0)
 	void *p = unlikely(n >= INT_MAX)
 		? vmalloc_noprof(n)
 		: kvmalloc_noprof(n, flags & ~__GFP_ZERO);
@@ -843,7 +847,8 @@ static inline void *class_memalloc_flags_lock_ptr(class_memalloc_flags_t *_T)
 	return _T;
 }
 
-#if !defined(__KERNEL__) || LINUX_VERSION_CODE >= KERNEL_VERSION(6,19,0)
+#if !defined(__KERNEL__) || (LINUX_VERSION_CODE <= KERNEL_VERSION(6,8,0) || \
+                             LINUX_VERSION_CODE >= KERNEL_VERSION(6,19,0))
 void *mempool_kvmalloc(gfp_t gfp_mask, void *pool_data);
 void mempool_kvfree(void *element, void *pool_data);
 
