@@ -81,6 +81,18 @@ static inline void memalloc_flags_restore(unsigned flags)
 }
 #endif
 
+#ifndef this_cpu_try_cmpxchg
+#define this_cpu_try_cmpxchg(pcp, oldp, new)            \
+({                                                      \
+    typeof(*(oldp)) __old = *(oldp);                    \
+    typeof(*(oldp)) __prev = this_cpu_cmpxchg(pcp, __old, new); \
+    bool __success = (__prev == __old);                 \
+    if (!__success)                                     \
+        *(oldp) = __prev;                               \
+    __success;                                          \
+})
+#endif
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 4, 0)
 static inline void mm_account_reclaimed_pages(unsigned long pages)
 {
