@@ -1138,13 +1138,71 @@ static inline void super_set_uuid(struct super_block *sb,
 #endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
-extern int generic_ci_d_hash(const struct dentry *dentry, struct qstr *str);
-extern int generic_ci_d_compare(const struct dentry *dentry, unsigned int len,
-				const char *str, const struct qstr *name);
+#include <linux/unicode.h>
+
+static inline bool needs_casefold(const struct inode *dir)
+{
+	return IS_CASEFOLDED(dir) && dir->i_sb->s_encoding;
+}
+
+static int bch2_generic_ci_d_compare(const struct dentry *dentry, unsigned int len,
+				const char *str, const struct qstr *name)
+{
+	const struct dentry *parent = READ_ONCE(dentry->d_parent);
+	const struct inode *dir = READ_ONCE(parent->d_inode);
+	const struct super_block *sb = dentry->d_sb;
+	const struct unicode_map *um = sb->s_encoding;
+	struct qstr qstr = QSTR_INIT(str, len);
+	char strbuf[DNAME_INLINE_LEN];
+	int ret;
+
+	if (!dir || !needs_casefold(dir))
+		goto fallback;
+	/*
+	 * If the dentry name is stored in-line, then it may be concurrently
+	 * modified by a rename.  If this happens, the VFS will eventually retry
+	 * the lookup, so it doesn't matter what ->d_compare() returns.
+	 * However, it's unsafe to call utf8_strncasecmp() with an unstable
+	 * string.  Therefore, we have to copy the name into a temporary buffer.
+	 */
+	if (len <= DNAME_INLINE_LEN - 1) {
+		memcpy(strbuf, str, len);
+		strbuf[len] = 0;
+		qstr.name = strbuf;
+		/* prevent compiler from optimizing out the temporary buffer */
+		barrier();
+	}
+	ret = utf8_strncasecmp(um, name, &qstr);
+	if (ret >= 0)
+		return ret;
+
+	if (sb_has_strict_encoding(sb))
+		return -EINVAL;
+fallback:
+	if (len != name->len)
+		return 1;
+	return !!memcmp(str, name->name, len);
+}
+
+static int bch2_generic_ci_d_hash(const struct dentry *dentry, struct qstr *str)
+{
+	const struct inode *dir = READ_ONCE(dentry->d_inode);
+	struct super_block *sb = dentry->d_sb;
+	const struct unicode_map *um = sb->s_encoding;
+	int ret = 0;
+
+	if (!dir || !needs_casefold(dir))
+		return 0;
+
+	ret = utf8_casefold_hash(um, dentry, str);
+	if (ret < 0 && sb_has_strict_encoding(sb))
+		return -EINVAL;
+	return 0;
+}
 
 static const struct dentry_operations bch2_generic_ci_dentry_ops = {
-	.d_hash = generic_ci_d_hash,
-	.d_compare = generic_ci_d_compare,
+	.d_hash = bch2_generic_ci_d_hash,
+	.d_compare = bch2_generic_ci_d_compare,
 };
 
 static inline void generic_set_sb_d_ops(struct super_block *sb)
@@ -1162,6 +1220,10 @@ static inline void generic_set_sb_d_ops(struct super_block *sb)
 #else
 #define bch2_shrinker_set_seeks(_shrinker, _value) \
 	(((_shrinker)->seeks) = (_value))
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
+extern void bio_add_folio_nofail(struct bio *bio, struct folio *folio, size_t len, size_t off);
 #endif
 
 #endif /* __KERNEL__ */
