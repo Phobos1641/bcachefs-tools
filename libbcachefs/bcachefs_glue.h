@@ -281,6 +281,18 @@ static inline void bch2_bio_add_virt_nofail(struct bio *bio, void *vaddr, unsign
 	bio_add_virt_nofail(_bio, _vaddr, _len)
 #endif
 
+#ifndef BLK_STS_RESV_CONFLICT
+#define BLK_STS_RESV_CONFLICT   ((__force blk_status_t)6)
+#endif
+
+#ifndef BLK_STS_DURATION_LIMIT
+#define BLK_STS_DURATION_LIMIT  ((__force blk_status_t)17)
+#endif
+
+#ifndef BLK_STS_INVAL
+#define BLK_STS_INVAL           ((__force blk_status_t)19)
+#endif
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 15, 0)
 static inline int ida_find_first_range(struct ida *ida, unsigned int min, unsigned int max)
 {
