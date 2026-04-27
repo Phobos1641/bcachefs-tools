@@ -585,8 +585,7 @@ static int bch2_topology_check_root(struct btree_trans *trans, enum btree_id btr
 static void ratelimit_reset(struct ratelimit_state *rs)
 {
 	guard(raw_spinlock)(&rs->lock);
-	atomic_set(&rs->rs_n_left, 0);
-	atomic_set(&rs->missed, 0);
+	bch2_ratelimit_atomic_reset(rs);
 	rs->flags = 0;
 	rs->begin = 0;
 }
