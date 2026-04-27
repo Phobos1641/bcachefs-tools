@@ -933,6 +933,21 @@ static inline void inode_wake_up_bit(struct inode *inode, u32 bit)
 #endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 7, 0)
+static inline bool in_group_or_capable(struct bch_idmap *idmap,
+			const struct inode *inode, vfsgid_t vfsgid)
+{
+	if (vfsgid_in_group_p(vfsgid))
+		return true;
+	if (capable_wrt_inode_uidgid(idmap, inode, CAP_FSETID))
+		return true;
+	return false;
+}
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(6, 12, 0)
+extern bool in_group_or_capable(struct user_namespace *mnt_userns,
+			const struct inode *inode, vfsgid_t vfsgid);
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 7, 0)
 static inline void folio_end_read(struct folio *folio, bool success)
 {
 	if (likely(success))
