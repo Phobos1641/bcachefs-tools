@@ -103,6 +103,39 @@ static __maybe_unused const bool class_##_name##_is_conditional = _is_cond
 DEFINE_FREE(kvfree, void *, if (_T) kvfree(_T))
 #endif
 
+#ifndef __DEFINE_LOCK_GUARD_1
+#define __DEFINE_LOCK_GUARD_1(_name, _type, ...)			\
+static __always_inline class_##_name##_t class_##_name##_constructor(_type *l) \
+	__no_context_analysis						\
+{									\
+	class_##_name##_t _t = { .lock = l }, *_T = &_t;		\
+	__VA_ARGS__;							\
+	return _t;							\
+}
+#endif
+
+#ifndef __DEFINE_LOCK_GUARD_0
+#define __DEFINE_LOCK_GUARD_0(_name, ...)				\
+static __always_inline class_##_name##_t class_##_name##_constructor(void) \
+	__no_context_analysis						\
+{									\
+	class_##_name##_t _t = { .lock = (void*)1 },			\
+			 *_T __maybe_unused = &_t;			\
+	__VA_ARGS__;							\
+	return _t;							\
+}
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 15, 0)
+DEFINE_LOCK_GUARD_1(percpu_read, struct percpu_rw_semaphore,
+                    percpu_down_read(_T->lock),
+                    percpu_up_read(_T->lock))
+
+DEFINE_LOCK_GUARD_1(percpu_write, struct percpu_rw_semaphore,
+                    percpu_down_read(_T->lock),
+                    percpu_up_read(_T->lock))
+#endif
+
 #ifndef this_cpu_try_cmpxchg
 #define this_cpu_try_cmpxchg(pcp, oldp, new)            \
 ({                                                      \
