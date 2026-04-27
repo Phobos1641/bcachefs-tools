@@ -67,6 +67,14 @@ static inline void bch2_ratelimit_atomic_reset(struct ratelimit_state *rs)
 #define alloc_hooks(expr) (expr)
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 4, 0)
+static inline void mm_account_reclaimed_pages(unsigned long pages)
+{
+	if (current->reclaim_state)
+		current->reclaim_state->reclaimed_slab += pages;
+}
+#endif
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 7, 0)
 struct bch_shrinker_wrap {
 	struct shrinker sh;		/* kernel's real shrinker -- this *must* be first */
