@@ -1222,8 +1222,28 @@ static inline void generic_set_sb_d_ops(struct super_block *sb)
 	(((_shrinker)->seeks) = (_value))
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
-extern void bio_add_folio_nofail(struct bio *bio, struct folio *folio, size_t len, size_t off);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 8, 0)
+static inline void bch2_bio_add_folio_nofail(struct bio *bio, struct folio *folio,
+					size_t len, size_t off)
+{
+	bool ok = bio_add_folio(bio, folio, len, off);
+	BUG_ON(!ok);
+}
+#else
+#define bch2_bio_add_folio_nofail(_bio, _folio, _len, _off) \
+	bio_add_folio_nofail(_bio, _folio, _len, _off)
+#endif
+
+#include <linux/fs.h>
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 12, 0)
+static inline void bch2_iget(struct inode *inode)
+{
+	lockdep_assert_held(&inode->i_lock);
+	atomic_inc(&inode->i_count);
+}
+#else
+#define bch2_iget(_inode) __iget(_inode)
 #endif
 
 #endif /* __KERNEL__ */

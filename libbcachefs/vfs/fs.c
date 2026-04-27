@@ -362,7 +362,8 @@ repeat:
 			}
 			goto repeat;
 		}
-		__iget(&inode->v);
+
+		bch2_iget(&inode->v);
 		spin_unlock(&inode->v.i_lock);
 	}
 
