@@ -541,7 +541,9 @@ static int six_lock_slowpath(struct six_lock *lock, enum six_lock_type type,
 		smp_mb__after_atomic();
 	}
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
 	trace_contention_begin(lock, 0);
+#endif
 	lock_contended(&lock->dep_map, ip);
 
 	wait->task		= current;
@@ -667,7 +669,9 @@ out:
 		kfree_rcu_mightsleep(old_wf);
 	kfree(new_wf);
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
 	trace_contention_end(lock, 0);
+#endif
 
 	return ret;
 }
