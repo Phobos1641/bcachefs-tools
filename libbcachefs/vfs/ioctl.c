@@ -370,39 +370,61 @@ static long __bch2_ioctl_subvolume_destroy(struct bch_fs *c, struct file *filp,
 					   struct printbuf *err)
 {
 	const char __user *name = (void __user *)(unsigned long)arg.dst_ptr;
-	struct filename *fname;
-	struct path path;
+	struct path parent_path;
 	struct dentry *victim;
 	struct inode *dir;
 	int ret = 0;
 
-	WARN_ON_ONCE(arg.dirfd != AT_FDCWD);
-
 	if (arg.flags)
 		return bch_err_throw(c, EINVAL_subvol_destroy_bad_flags);
 
-	fname = getname(name);
-	if (IS_ERR(fname))
-		return PTR_ERR(fname);
+	if (arg.dirfd != AT_FDCWD)
+		return -EINVAL;  /* see note below */
 
-	victim = kern_path_locked(fname->name, &path);
-	putname(fname);
-	if (IS_ERR(victim))
-		return PTR_ERR(victim);
+	/*
+	 * Resolve the parent directory: LOOKUP_PARENT walks all but the
+	 * last component, leaving the basename in the nameidata's last
+	 * component (which we don't get direct access to from out-of-tree).
+	 *
+	 * Workaround: resolve the full path, walk to its parent, and
+	 * re-lookup the basename under the locked parent. The post-lock
+	 * revalidation catches concurrent rename.
+	 */
+	struct path victim_path;
+	ret = user_path_at(arg.dirfd, name, 0, &victim_path);
+	if (ret)
+		return ret;
 
-	dir = d_inode(path.dentry);
+	struct dentry *victim_d = dget(victim_path.dentry);
+	struct dentry *parent_d = dget_parent(victim_d);
+
+	parent_path.mnt = mntget(victim_path.mnt);
+	parent_path.dentry = parent_d;
+	path_put(&victim_path);
+
+	dir = d_inode(parent_d);
+	inode_lock_nested(dir, I_MUTEX_PARENT);
+
+	/* Revalidate after lock: parent could have changed, victim could
+	 * have been renamed or unlinked. */
+	if (victim_d->d_parent != parent_d || d_unhashed(victim_d)) {
+		ret = -ENOENT;
+		goto err;
+	}
+	victim = victim_d;
+
 	if (victim->d_sb->s_fs_info != c) {
 		ret = -EXDEV;
 		goto err;
 	}
 
 	inode_unlock(dir);
-	ret = mnt_want_write(path.mnt);
+	ret = mnt_want_write(parent_path.mnt);
 	inode_lock(dir);
 	if (ret)
 		goto err;
 
-	if (d_unhashed(victim) || victim->d_parent != path.dentry) {
+	if (d_unhashed(victim) || victim->d_parent != parent_d) {
 		ret = -ENOENT;
 		goto err_write;
 	}
@@ -413,15 +435,12 @@ static long __bch2_ioctl_subvolume_destroy(struct bch_fs *c, struct file *filp,
 		fsnotify_rmdir(dir, victim);
 		d_invalidate(victim);
 	}
-
 err_write:
-	mnt_drop_write(path.mnt);
-
+	mnt_drop_write(parent_path.mnt);
 err:
 	inode_unlock(dir);
-	dput(victim);
-	path_put(&path);
-
+	dput(victim_d);
+	path_put(&parent_path);
 	return ret;
 }
 #else
