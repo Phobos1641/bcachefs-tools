@@ -613,7 +613,7 @@ void bch2_bio_map(struct bio *bio, void *base, size_t size)
 	if (is_vmalloc_addr(base))
 		bio_add_vmalloc(bio, base, size);
 	else
-		bio_add_virt_nofail(bio, base, size);
+		bch2_bio_add_virt_nofail(bio, base, size);
 }
 
 /*
@@ -708,7 +708,7 @@ int bch2_bio_alloc_pages(struct bio *bio, unsigned bs, size_t size, gfp_t gfp_ma
 		if (!p)
 			return -ENOMEM;
 
-		bio_add_virt_nofail(bio, p, b);
+		bch2_bio_add_virt_nofail(bio, p, b);
 	}
 
 	return 0;

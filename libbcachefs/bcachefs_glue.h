@@ -28,6 +28,9 @@ static inline void bch2_ratelimit_atomic_reset(struct ratelimit_state *rs)
 #define bch2_chacha20_crypt(_state, _dst, _src, _bytes)	chacha20_crypt(_state, _dst, _src, _bytes)
 #define bch2_chacha_zeroize_state(_state)				chacha_zeroize_state(_state)
 
+#define bch2_bio_add_virt_nofail(_bio, _vaddr, _len) \
+	bio_add_virt_nofail(_bio, _vaddr, _len)
+
 #else
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 7, 0)
@@ -124,6 +127,16 @@ static inline void bch2_chacha_zeroize_state(struct chacha_state *state)
 {
 	chacha_zeroize_state(state);
 }
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 16, 0)
+static inline void bch2_bio_add_virt_nofail(struct bio *bio, void *vaddr, unsigned len)
+{
+	__bio_add_page(bio, virt_to_page(vaddr), len, offset_in_page(vaddr));
+}
+#else
+#define bch2_bio_add_virt_nofail(_bio, _vaddr, _len) \
+	bio_add_virt_nofail(_bio, _vaddr, _len)
 #endif
 
 #endif /* __KERNEL__ */

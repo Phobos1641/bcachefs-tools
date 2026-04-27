@@ -832,7 +832,7 @@ static void __bch2_bio_alloc_pages_pool(struct bch_fs *c, struct bio *bio,
 	mutex_lock(&c->bio_bounce_pages_lock);
 
 	while (bio->bi_iter.bi_size < size)
-		bio_add_virt_nofail(bio,
+		bch2_bio_add_virt_nofail(bio,
 				    mempool_alloc(&c->bio_bounce_bufs, GFP_NOFS),
 				    BIO_BOUNCE_BUF_POOL_LEN);
 
