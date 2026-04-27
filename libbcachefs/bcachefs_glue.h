@@ -225,6 +225,19 @@ static inline struct shrinker *shrinker_alloc(unsigned int flags, const char *fm
 	return &w->sh;  /* caller sees a shrinker structure, as expected */
 }
 
+static inline int shrinker_register(struct shrinker *sh)
+{
+    struct bch_shrinker_wrap *w = container_of(sh, struct bch_shrinker_wrap, sh);
+    return register_shrinker(sh, "%s", w->name);
+}
+
+static inline void shrinker_free(struct shrinker *sh)
+{
+    struct bch_shrinker_wrap *w = container_of(sh, struct bch_shrinker_wrap, sh);
+    unregister_shrinker(sh);
+    kfree(w);
+}
+
 #define bch2_shrinker_get_private(_s) \
     (container_of((_s), struct bch_shrinker_wrap, sh)->private_data)
 
