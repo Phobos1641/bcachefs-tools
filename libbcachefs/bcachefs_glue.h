@@ -932,6 +932,23 @@ static inline void inode_wake_up_bit(struct inode *inode, u32 bit)
 }
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 12, 0)
+static inline int inode_init_always_gfp(struct super_block *sb,
+			struct inode *inode, gfp_t gfp)
+{
+	if (gfp & __GFP_DIRECT_RECLAIM)
+		return inode_init_always(sb, inode);
+
+	int ret;
+
+	unsigned int noio_flags = memalloc_noio_save();
+	ret = inode_init_always(sb, inode);
+	memalloc_noio_restore(noio_flags);
+
+	return ret;
+}
+#endif
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 7, 0)
 static inline bool in_group_or_capable(struct bch_idmap *idmap,
 			const struct inode *inode, vfsgid_t vfsgid)
