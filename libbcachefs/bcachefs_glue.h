@@ -54,6 +54,11 @@ static inline void bch2_ratelimit_atomic_reset(struct ratelimit_state *rs)
 #define BCACHEFS_SUPER_MAGIC	0xca451a4e
 #endif
 
+#ifndef struct_size_t
+#define struct_size_t(type, member, count)                                     \
+       struct_size((type *)NULL, member, count)
+#endif
+
 #ifndef cmp_int
 #define cmp_int(l ,r) (((l) > (r)) - ((l) < (r)))
 #endif
