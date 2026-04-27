@@ -902,6 +902,15 @@ static inline void d_mark_tmpfile(struct file *file, struct inode *inode)
 }
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 12, 0)
+static inline void unpin_user_folio(struct folio *folio, unsigned long npages)
+{
+	unsigned long i;
+	for (i = 0; i < npages; ++i)
+		unpin_user_page(folio_page(folio, i));
+}
+#endif
+
 #endif /* __KERNEL__ */
 
 #endif /* _BCACHEFS_GLUE_H */
