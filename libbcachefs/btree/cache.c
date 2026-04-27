@@ -686,7 +686,7 @@ static int btree_node_reclaim(struct bch_fs *c, struct btree *b,
 static unsigned long bch2_btree_cache_scan(struct shrinker *shrink,
 					   struct shrink_control *sc)
 {
-	struct btree_cache_list *list = shrink->private_data;
+	struct btree_cache_list *list = bch2_shrinker_get_private(shrink);
 	struct bch_fs_btree_cache *bc =
 		container_of(list, struct bch_fs_btree_cache, live[list->idx]);
 	struct bch_fs *c = container_of(bc, struct bch_fs, btree.cache);
@@ -776,7 +776,7 @@ out:
 static unsigned long bch2_btree_cache_count(struct shrinker *shrink,
 					    struct shrink_control *sc)
 {
-	struct btree_cache_list *list = shrink->private_data;
+	struct btree_cache_list *list = bch2_shrinker_get_private(shrink);
 
 	if (static_branch_unlikely(&bch2_btree_shrinker_disabled))
 		return 0;
@@ -1509,7 +1509,7 @@ int bch2_fs_btree_cache_init(struct bch_fs *c)
 	shrink->count_objects	= bch2_btree_cache_count;
 	shrink->scan_objects	= bch2_btree_cache_scan;
 	shrink->seeks		= 2;
-	shrink->private_data	= &bc->live[0];
+	bch2_shrinker_set_private(shrink, &bc->live[0]);
 	shrinker_register(shrink);
 
 	shrink = shrinker_alloc(0, "%s-btree_cache-pinned", c->name);
@@ -1519,7 +1519,7 @@ int bch2_fs_btree_cache_init(struct bch_fs *c)
 	shrink->count_objects	= bch2_btree_cache_count;
 	shrink->scan_objects	= bch2_btree_cache_scan;
 	shrink->seeks		= 8;
-	shrink->private_data	= &bc->live[1];
+	bch2_shrinker_set_private(shrink, &bc->live[1]);
 	shrinker_register(shrink);
 
 	return 0;
