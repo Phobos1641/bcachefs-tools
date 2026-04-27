@@ -869,6 +869,11 @@ static inline void bch2_bdev_release(struct bch_file_handle *h)
 	bdev_fput((_fp))
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 8, 0)
+#define bdev_freeze freeze_bdev
+#define bdev_thaw thaw_bdev
+#endif
+
 #endif /* __KERNEL__ */
 
 #endif /* _BCACHEFS_GLUE_H */
