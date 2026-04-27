@@ -281,6 +281,10 @@ static inline void bch2_bio_add_virt_nofail(struct bio *bio, void *vaddr, unsign
 	bio_add_virt_nofail(_bio, _vaddr, _len)
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 15, 0)
+#define FS_LBS 0
+#endif
+
 #endif /* __KERNEL__ */
 
 #endif /* _BCACHEFS_GLUE_H */
