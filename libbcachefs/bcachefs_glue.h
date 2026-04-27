@@ -35,6 +35,21 @@ static inline void bch2_ratelimit_atomic_reset(struct ratelimit_state *rs)
 
 #else
 
+#include <linux/cleanup.h>
+#include <linux/generic-radix-tree.h>
+#include <linux/percpu-defs.h>
+#include <linux/percpu-rwsem.h>
+#include <linux/rcupdate.h>
+#include <linux/shrinker.h>
+#include <linux/sort.h>
+#include <linux/swap.h>
+#include <linux/ratelimit.h>
+#include <linux/bio.h>
+#include <linux/string.h>
+#include <linux/blk_types.h>
+#include <linux/fs_parser.h>
+#include <crypto/chacha.h>
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 8, 0)
 #define MAX_PAGE_ORDER MAX_ORDER
 #endif
