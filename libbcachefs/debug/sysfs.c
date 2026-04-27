@@ -664,7 +664,7 @@ struct attribute *bch2_fs_internal_files[] = {
 /* btree transaction stats - JSON via bin_attribute */
 
 static ssize_t bch2_btree_trans_stats_json_read(struct file *file,
-		struct kobject *kobj, const struct bin_attribute *attr,
+		struct kobject *kobj, __bch2_bin_attribute_const struct bin_attribute *attr,
 		char *buf, loff_t off, size_t count)
 {
 	struct bch_fs *c = container_of(kobj, struct bch_fs, internal);
@@ -726,7 +726,7 @@ static ssize_t bch2_btree_trans_stats_json_read(struct file *file,
 }
 
 static ssize_t bch2_btree_trans_stats_json_write(struct file *file,
-		struct kobject *kobj, const struct bin_attribute *attr,
+		struct kobject *kobj, __bch2_bin_attribute_const struct bin_attribute *attr,
 		char *buf, loff_t off, size_t count)
 {
 	struct bch_fs *c = container_of(kobj, struct bch_fs, internal);
