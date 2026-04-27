@@ -13,6 +13,10 @@
 	#define TYPEOF_UNQUAL(exp) __typeof_unqual__(exp)
 #endif
 
+#ifndef __force
+#define __force
+#endif
+
 #ifndef __KERNEL__
 
 #define __bch2_bin_attribute_const const
