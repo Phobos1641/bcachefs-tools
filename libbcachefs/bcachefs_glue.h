@@ -293,6 +293,14 @@ static inline void bch2_bio_add_virt_nofail(struct bio *bio, void *vaddr, unsign
 #define BLK_STS_INVAL           ((__force blk_status_t)19)
 #endif
 
+#ifndef QSTR_INIT
+#define QSTR_INIT(n,l) { { { .len = l } }, .name = n }
+#endif
+
+#ifndef QSTR
+#define QSTR(n) (struct qstr)QSTR_INIT(n, strlen(n))
+#endif
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 15, 0)
 static inline int ida_find_first_range(struct ida *ida, unsigned int min, unsigned int max)
 {
