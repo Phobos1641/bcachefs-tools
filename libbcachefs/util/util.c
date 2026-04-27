@@ -284,6 +284,7 @@ int bch2_save_backtrace(bch_stacktrace *stack, struct task_struct *task, unsigne
 	unsigned nr_entries = 0;
 	int ret = 0;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 7, 0)
 	stack->nr = 0;
 	try(darray_make_room_gfp(stack, 32, gfp));
 
@@ -293,6 +294,7 @@ int bch2_save_backtrace(bch_stacktrace *stack, struct task_struct *task, unsigne
 		nr_entries = stack_trace_save_tsk(task, stack->data, stack->size, skipnr);
 	} while (nr_entries == stack->size &&
 		 !(ret = darray_make_room_gfp(stack, stack->size * 2, gfp)));
+#endif
 
 	stack->nr = nr_entries;
 	return ret;
