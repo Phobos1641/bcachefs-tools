@@ -911,6 +911,27 @@ static inline void unpin_user_folio(struct folio *folio, unsigned long npages)
 }
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 12, 0)
+#define inode_state_wait_address(inode, bit) \
+	((char *)&(inode)->i_state + (bit))
+
+static inline struct wait_queue_head *inode_bit_waitqueue(struct wait_bit_queue_entry *wqe,
+			struct inode *inode, u32 bit)
+{
+	void *bit_address;
+
+	bit_address = inode_state_wait_address(inode, bit);
+	init_wait_var_entry(wqe, bit_address, 0);
+	return __var_waitqueue(bit_address);
+}
+
+static inline void inode_wake_up_bit(struct inode *inode, u32 bit)
+{
+	/* Caller is responsible for correct memory barriers. */
+	wake_up_var(inode_state_wait_address(inode, bit));
+}
+#endif
+
 #endif /* __KERNEL__ */
 
 #endif /* _BCACHEFS_GLUE_H */
