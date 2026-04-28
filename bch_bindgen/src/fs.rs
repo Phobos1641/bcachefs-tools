@@ -115,6 +115,10 @@ impl Fs {
     }
 
     pub fn open(devs: &[PathBuf], mut opts: c::bch_opts) -> Result<Fs, BchError> {
+        for dev in devs {
+            eprintln!("Fs::open device: {}", dev.display());
+        }
+
         let devs_cstrs : Vec<_> = devs
             .iter()
             .map(|i| CString::new(i.as_os_str().as_bytes()).unwrap())
