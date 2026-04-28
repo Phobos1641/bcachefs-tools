@@ -255,6 +255,19 @@ static long __bch2_ioctl_subvolume_create(struct bch_fs *c, struct file *filp,
 	}
 
 	if (arg.src_ptr) {
+#ifdef DEBUG
+		char debug_buf[256];
+		long debug_len = strncpy_from_user(debug_buf,
+				(const char __user *)(unsigned long)arg.src_ptr,
+				sizeof(debug_buf));
+		if (debug_len >= 0) {
+			debug_buf[sizeof(debug_buf) - 1] = '\0';
+			pr_debug("src_path arg: \"%s\" (len=%ld)\n", debug_buf, debug_len);
+		} else {
+			pr_debug("src_path arg: <strncpy_from_user failed: %ld>\n", debug_len);
+		}
+#endif
+
 		error = user_path_at(arg.dirfd,
 				(const char __user *)(unsigned long)arg.src_ptr,
 				how, &src_path);
