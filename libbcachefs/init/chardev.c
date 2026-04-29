@@ -767,7 +767,7 @@ static const struct file_operations bch_chardev_fops = {
 };
 
 static int bch_chardev_major;
-static const struct class bch_chardev_class = {
+static __bch2_chardev_class_const struct class bch_chardev_class = {
 	.name = "bcachefs",
 };
 static struct device *bch_chardev;

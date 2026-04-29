@@ -16,6 +16,7 @@
 #ifndef __KERNEL__
 
 #define __bch2_bin_attribute_const const
+#define __bch2_chardev_class_const const
 
 #define bch2_shrinker_get_private(_s)           ((_s)->private_data)
 #define bch2_shrinker_set_private(_s, _priv)    ((_s)->private_data) = _priv;
@@ -43,6 +44,12 @@ static inline void bch2_ratelimit_atomic_reset(struct ratelimit_state *rs)
 #define __bch2_bin_attribute_const
 #else
 #define __bch2_bin_attribute_const const
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 6, 0)
+#define __bch2_chardev_class_const
+#else
+#define __bch2_chardev_class_const const
 #endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 7, 0)
