@@ -1026,6 +1026,19 @@ static inline void zero_fill_bio_iter(struct bio *bio, struct bvec_iter start)
 }
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 4, 0)
+#include <linux/xattr.h>
+
+static inline bool xattr_handler_can_list(const struct xattr_handler *handler,
+            struct dentry *dentry)
+{
+    return handler && (!handler->list || handler->list(dentry));
+}
+
+#define nop_posix_acl_access posix_acl_access_xattr_handler
+#define nop_posix_acl_default posix_acl_default_xattr_handler
+#endif
+
 #endif /* __KERNEL__ */
 
 #endif /* _BCACHEFS_GLUE_H */
