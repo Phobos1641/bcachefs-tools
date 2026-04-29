@@ -67,14 +67,9 @@ static inline void bch2_ratelimit_atomic_reset(struct ratelimit_state *rs)
 
 #define bch_file file
 
-#define bch2_bdev_from_handle(_handle) \
-	file_bdev(_handle)
-
-#define bch2_bdev_file_open_by_path(_path, _mode, _holder, _hops) \
-	bdev_file_open_by_path(_path, _mode, _holder, _hops)
-
-#define bch2_bdev_release(_fp) \
-	bdev_fput((_fp))
+#define bch2_bdev_from_handle(_handle) file_bdev(_handle)
+#define bch2_bdev_file_open_by_path(_path, _mode, _holder, _hops) bdev_file_open_by_path(_path, _mode, _holder, _hops)
+#define bch2_bdev_fput(_fp, _holder) bdev_fput((_fp))
 
 #else
 
@@ -137,7 +132,7 @@ static inline void bch2_ratelimit_atomic_reset(struct ratelimit_state *rs)
 #endif
 
 #ifndef BLK_STS_DURATION_LIMIT
-#define BLK_STS_DURATION_LIMIT ((__force blk_status_t)17)
+#define BLK_STS_DURATION_LIMIT ((__force blk_status_t)18)
 #endif
 
 #ifndef BLK_STS_INVAL
@@ -655,7 +650,7 @@ static inline void __genradix_iter_rewind(struct genradix_iter *iter,
 	     genradix_iter_rewind(&_iter, _radix))
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 9, 0)
+#if 0 // LINUX_VERSION_CODE < KERNEL_VERSION(6, 9, 0)
 struct bdev_inode {
 	struct block_device bdev;
 	struct inode vfs_inode;
@@ -825,32 +820,20 @@ static inline void* bch2_kvrealloc(void *p, size_t oldsize, size_t newsize, int 
 	kvrealloc((p), (newsize), (flags))
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 9, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 5, 0)
 #define BCH_BLK_OPEN_READ	BLK_OPEN_READ
 #define BCH_BLK_OPEN_WRITE	BLK_OPEN_WRITE
 #define BCH_BLK_OPEN_EXCL	BLK_OPEN_EXCL
 
-#define bch_blk_mode_t fmode_t
-
 #define bch_file bch_file_handle
-#else
-#define BCH_BLK_OPEN_READ	FMODE_READ
-#define BCH_BLK_OPEN_WRITE	FMODE_WRITE
-#define BCH_BLK_OPEN_EXCL	FMODE_EXCL
 
-#define bch_blk_mode_t blk_mode_t
-
-#define bch_file file
-#endif
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 9, 0)
 struct bch_file_handle {
 	struct block_device *bdev;
 	void *holder;
 	fmode_t mode;
 };
 
-static inline struct block_device *bch2_bdev_from_handle(struct bch_file_handle *h)
+static inline struct block_device *bch2_bdev_from_handle(struct bch_file *h)
 {
 	return h->bdev;
 }
@@ -858,16 +841,18 @@ static inline struct block_device *bch2_bdev_from_handle(struct bch_file_handle 
 #define bch2_bdev_set_file(_file_handle, _fp) \
 	((_file_handle)->bdev = _fp)
 
-static inline struct bch_file * bch2_bdev_file_open_by_path(const char *path, bch_blk_mode_t mode, void *holder, const struct blk_holder_ops *hops)
+static inline struct bch_file * bch2_bdev_file_open_by_path(const char *path, fmode_t mode, void *holder, const struct blk_holder_ops *hops)
 {
-	struct bch_file_handle *h = kzalloc(sizeof(*h), GFP_KERNEL);
+	struct bch_file *h = kzalloc(sizeof(*h), GFP_KERNEL);
 	if (!h)
 		return ERR_PTR(-ENOMEM);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 6, 0)
-	h->bdev = blkdev_get_by_path(path, mode, holder);
-#else
+	/* The PTR kernel has cherry-picked the commits relating to the hops parameter */
+
+#if 1
 	h->bdev = blkdev_get_by_path(path, mode, holder, hops);
+#else
+	h->bdev = blkdev_get_by_path(path, mode, holder);
 #endif
 	if (IS_ERR(h->bdev)) {
 		long err = PTR_ERR(h->bdev);
@@ -879,24 +864,52 @@ static inline struct bch_file * bch2_bdev_file_open_by_path(const char *path, bc
 	return h;
 }
 
-static inline void bch2_bdev_release(struct bch_file_handle *h)
+static inline void bch2_bdev_fput(struct bch_file *h, void *)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 6, 0)
 	blkdev_put(h->bdev, h->mode);
-#else
-	blkdev_put(h->bdev, h->holder);
-#endif
 	kfree(h);
 }
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(6, 9, 0)
+#define BCH_BLK_OPEN_READ	FMODE_READ
+#define BCH_BLK_OPEN_WRITE	FMODE_WRITE
+#define BCH_BLK_OPEN_EXCL	FMODE_EXCL
+
+#define bch_file file
+
+#define bch2_bdev_from_handle(_handle) file_bdev(_handle)
+
+static inline struct file *bch2_bdev_file_open_by_path(const char *path, blk_mode_t mode, void *holder, const struct blk_holder_ops *hops)
+{
+    return (struct file *)blkdev_get_by_path(path, mode, holder, hops);
+}
+
+static inline struct block_device *file_bdev(struct file *f)
+{
+        return (struct block_device *)f;
+}
+
+static inline void bch2_bdev_fput(struct file *f, void *holder)
+{
+	blkdev_put((struct block_device *)f, holder);
+}
 #else
-#define bch2_bdev_from_handle(_handle) \
-	file_bdev(_handle)
+#define BCH_BLK_OPEN_READ	FMODE_READ
+#define BCH_BLK_OPEN_WRITE	FMODE_WRITE
+#define BCH_BLK_OPEN_EXCL	FMODE_EXCL
 
-#define bch2_bdev_file_open_by_path(_path, _mode, _holder, _hops) \
-	bdev_file_open_by_path(_path, _mode, _holder, _hops)
+#define bch_file file
 
-#define bch2_bdev_release(_fp) \
-	bdev_fput((_fp))
+#define bch2_bdev_from_handle(_handle) file_bdev(_handle)
+
+static inline struct file *bch2_bdev_file_open_by_path(const char *path, blk_mode_t mode, void *holder, const struct blk_holder_ops *hops)
+{
+    return bdev_file_open_by_path(path, mode, holder, hops);
+}
+
+static inline void bch2_bdev_fput(struct bch_file *h, void *p)
+{
+	bdev_fput(h);
+}
 #endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 8, 0)
@@ -1128,7 +1141,9 @@ static inline struct timespec64 inode_get_mtime(const struct inode *inode)
 {
 	return inode->i_mtime;
 }
+#endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 64)
 static inline struct timespec64 inode_get_ctime(const struct inode *inode)
 {
 	return inode->i_ctime;
@@ -1313,6 +1328,36 @@ static inline const char *errname(int err)
 	default:        return "<unknown error>";
 	}
 }
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 5, 0)
+#define lock_set_cmp_fn(lock, ...) do { } while (0)
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 6, 0)
+static inline void zero_fill_bio_iter(struct bio *bio, struct bvec_iter start)
+{
+	struct bio_vec bv;
+	struct bvec_iter iter;
+
+	__bio_for_each_segment(bv, bio, iter, start)
+		memzero_bvec(&bv);
+}
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 4, 0)
+#include <linux/xattr.h>
+
+static inline bool xattr_handler_can_list(const struct xattr_handler *handler,
+			struct dentry *dentry)
+{
+	return handler && (!handler->list || handler->list(dentry));
+}
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 4, 0)
+#define nop_posix_acl_access	posix_acl_access_xattr_handler
+#define nop_posix_acl_default	posix_acl_default_xattr_handler
 #endif
 
 #endif /* __KERNEL__ */
