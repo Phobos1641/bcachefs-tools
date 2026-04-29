@@ -128,6 +128,8 @@ static inline unsigned long _find_next_bit(const unsigned long *addr,
 	if (!nbits || start >= nbits)
 		return nbits;
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds"
 	tmp = addr[start / BITS_PER_LONG] ^ invert;
 
 	/* Handle 1st word. */
@@ -141,6 +143,7 @@ static inline unsigned long _find_next_bit(const unsigned long *addr,
 
 		tmp = addr[start / BITS_PER_LONG] ^ invert;
 	}
+#pragma GCC diagnostic pop
 
 	return min(start + __ffs(tmp), nbits);
 }
