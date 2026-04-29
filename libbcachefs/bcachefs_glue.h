@@ -1011,6 +1011,10 @@ static inline vfsgid_t i_gid_into_vfsgid(struct user_namespace *mnt_userns,
 }
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 5, 0)
+#define lock_set_cmp_fn(lock, ...) do { } while (0)
+#endif
+
 #endif /* __KERNEL__ */
 
 #endif /* _BCACHEFS_GLUE_H */
