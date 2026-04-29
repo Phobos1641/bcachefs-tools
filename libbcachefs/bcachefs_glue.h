@@ -1015,6 +1015,17 @@ static inline vfsgid_t i_gid_into_vfsgid(struct user_namespace *mnt_userns,
 #define lock_set_cmp_fn(lock, ...) do { } while (0)
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 6, 0)
+static inline void zero_fill_bio_iter(struct bio *bio, struct bvec_iter start)
+{
+    struct bio_vec bv;
+    struct bvec_iter iter;
+
+    __bio_for_each_segment(bv, bio, iter, start)
+        memzero_bvec(&bv);
+}
+#endif
+
 #endif /* __KERNEL__ */
 
 #endif /* _BCACHEFS_GLUE_H */
