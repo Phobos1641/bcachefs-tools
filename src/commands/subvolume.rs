@@ -777,6 +777,7 @@ fn cmd_create(targets: Vec<PathBuf>) -> Result<()> {
         };
 
         if let Some(dirname) = target.parent() {
+            eprintln!("BcachefsHandle::open(): {}", dirname.display());
             let fs = BcachefsHandle::open(dirname).context("Failed to open the filesystem")?;
             fs.create_subvolume(target)
                 .context("Failed to create the subvolume")?;
@@ -792,6 +793,7 @@ fn cmd_delete(targets: Vec<PathBuf>) -> Result<()> {
             .context("subvolume path does not exist or can not be canonicalized")?;
 
         if let Some(dirname) = target.parent() {
+            eprintln!("BcachefsHandle::open(): {}", dirname.display());
             let fs = BcachefsHandle::open(dirname).context("Failed to open the filesystem")?;
             fs.delete_subvolume(target)
                 .context("Failed to delete the subvolume")?;
@@ -804,6 +806,7 @@ fn cmd_snapshot(read_only: bool, source: Option<PathBuf>, dest: PathBuf) -> Resu
     if let Some(dirname) = dest.parent() {
         let dot = PathBuf::from(".");
         let dir = if dirname.as_os_str().is_empty() { &dot } else { dirname };
+        eprintln!("BcachefsHandle::open(): {}", dir.display());
         let fs = BcachefsHandle::open(dir).context("Failed to open the filesystem")?;
 
         fs.snapshot_subvolume(

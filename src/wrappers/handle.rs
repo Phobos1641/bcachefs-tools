@@ -133,6 +133,9 @@ impl BcachefsHandle {
         let path = path.as_ref();
         let path_str = path.to_string_lossy();
 
+        eprintln!("BcachefsHandle::open() path: {}", path.display());
+        eprintln!("BcachefsHandle::open() path_str: {}", path_str);
+
         // Try as UUID string first
         if let Ok(uuid) = parse_uuid(&path_str) {
             return Self::open_by_name(&path_str, Some(uuid))
@@ -152,6 +155,7 @@ impl BcachefsHandle {
             libc::ioctl(path_fd.as_raw_fd(), BCH_IOCTL_QUERY_UUID, &mut query_uuid)
         };
         if ret == 0 {
+            eprintln!("BcachefsHandle::open(): ioctl BCH_IOCTL_QUERY_UUID returned UUID {:?}", query_uuid.uuid);
             return Self::open_mounted_path(path_fd, query_uuid.uuid);
         }
 
@@ -165,6 +169,7 @@ impl BcachefsHandle {
         let mode = stat.st_mode & libc::S_IFMT;
 
         if mode == libc::S_IFBLK {
+            eprintln!("BcachefsHandle::open(): mode == libc::S_IFBLK");
             // Block device: try sysfs symlink
             let major = rustix::fs::major(stat.st_rdev);
             let minor = rustix::fs::minor(stat.st_rdev);
@@ -184,6 +189,8 @@ impl BcachefsHandle {
             }
         }
 
+        eprintln!("BcachefsHandle::open(): read superblock to get UUID");
+
         // Fallback: read superblock to get UUID
         Self::open_via_superblock(path)
     }
@@ -200,6 +207,7 @@ impl BcachefsHandle {
             let name_len = fs_path.len as usize;
             let name = std::str::from_utf8(&fs_path.name[..name_len])
                 .map_err(|_| BchError::from_raw(-libc::EINVAL))?;
+            eprintln!("BcachefsHandle::open_mounted_path(): ioctl FS_IOC_GETFSSYSFSPATH returned {}", name);
             let sysfs = format!("/sys/fs/{}", name);
             rustix::fs::open(
                 sysfs.as_str(),
@@ -207,9 +215,12 @@ impl BcachefsHandle {
                 rustix::fs::Mode::empty(),
             ).map_err(|e| BchError::from_raw(-e.raw_os_error()))?
         } else {
+            eprintln!("BcachefsHandle::open_mounted_path(): ioctl FS_IOC_GETFSSYSFSPATH failed");
+
             // Fallback: use UUID
             let uuid_str = format_uuid(&uuid);
             let sysfs = format!("{}{}", SYSFS_BASE, uuid_str);
+            eprintln!("BcachefsHandle::open_mounted_path(): opening via sysfs {}", sysfs);
             rustix::fs::open(
                 sysfs.as_str(),
                 rustix::fs::OFlags::RDONLY,
