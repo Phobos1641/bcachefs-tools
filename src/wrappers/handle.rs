@@ -1,8 +1,12 @@
+use std::borrow::Cow;
 use std::ffi::CStr;
+use std::fs;
 use std::io;
 use std::mem;
 use std::os::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd};
 use std::path::Path;
+use std::path::PathBuf;
+use uuid::Uuid;
 
 use bch_bindgen::c::{
     bch_data_type,
@@ -170,18 +174,22 @@ impl BcachefsHandle {
 
         if mode == libc::S_IFBLK {
             eprintln!("BcachefsHandle::open(): mode == libc::S_IFBLK");
-            // Block device: try sysfs symlink
             let major = rustix::fs::major(stat.st_rdev);
             let minor = rustix::fs::minor(stat.st_rdev);
             let sysfs_link = format!("/sys/dev/block/{}:{}/bcachefs", major, minor);
 
             if let Ok(target) = std::fs::read_link(&sysfs_link) {
                 let target = target.to_string_lossy();
-                // target looks like "../../fs/bcachefs/<uuid>/dev-N"
-                // We need to extract uuid and dev_idx
-                if let Some((uuid_str, dev_idx)) = parse_sysfs_link(&target) {
-                    let uuid = parse_uuid(uuid_str).ok();
-                    let mut handle = Self::open_by_name(uuid_str, uuid)
+                if let Some((fs_id, dev_idx)) = parse_sysfs_link(&target) {
+                    let uuid = match &fs_id {
+                        FsId::Uuid(u) => Some(u.into_bytes()),
+                        FsId::DevName(name) => {
+                            std::fs::read_to_string(format!("/sys/fs/bcachefs/{name}/uuid"))
+                                .ok()
+                                .and_then(|s| parse_uuid(s.trim()).ok())
+                        }
+                    };
+                    let mut handle = Self::open_by_name(&fs_id.as_sysfs_component(), uuid)
                         .map_err(|e| BchError::from_raw(-e.0))?;
                     handle.dev_idx = dev_idx;
                     return Ok(handle);
@@ -195,38 +203,68 @@ impl BcachefsHandle {
         Self::open_via_superblock(path)
     }
 
+    fn find_bcachefs_sysfs_dir(uuid: Uuid, path_fd: BorrowedFd) -> io::Result<PathBuf> {
+        // 1. Modern scheme: directory named by the FS UUID.
+        let by_uuid = PathBuf::from(format!("/sys/fs/bcachefs/{}", uuid.hyphenated()));
+        if by_uuid.exists() {
+            return Ok(by_uuid);
+        }
+
+        // 2. Scheme-agnostic: scan and match the `uuid` attribute file.
+        //    Works on modern kernels too; cheap insurance.
+        if let Ok(rd) = fs::read_dir("/sys/fs/bcachefs") {
+            for entry in rd.flatten() {
+                let path = entry.path();
+                if let Ok(s) = fs::read_to_string(path.join("uuid")) {
+                    if Uuid::parse_str(s.trim()).ok() == Some(uuid) {
+                        return Ok(path);
+                    }
+                }
+            }
+        }
+
+        // 3. Last resort: derive the block-device basename from the mount fd.
+        //    Old bcachefs named sysfs dirs after the backing device.
+        let stat = rustix::fs::fstat(path_fd)?;
+        let (maj, min) = (rustix::fs::major(stat.st_dev), rustix::fs::minor(stat.st_dev));
+        if let Ok(target) = fs::read_link(format!("/sys/dev/block/{maj}:{min}")) {
+            if let Some(name) = target.file_name() {
+                let by_devname = PathBuf::from("/sys/fs/bcachefs").join(name);
+                if by_devname.exists() {
+                    return Ok(by_devname);
+                }
+            }
+        }
+
+        Err(io::Error::new(io::ErrorKind::NotFound, "bcachefs sysfs dir not found"))
+    }
+
     /// Open a mounted filesystem path. The fd becomes the ioctl fd.
     fn open_mounted_path(ioctl_fd: OwnedFd, uuid: [u8; 16]) -> Result<Self, BchError> {
-        // Try FS_IOC_GETFSSYSFSPATH to get sysfs path
+        // Try FS_IOC_GETFSSYSFSPATH first — canonical answer on 6.12+.
         let mut fs_path = FsSysfsPath { len: 0, name: [0; 128] };
         let ret = unsafe {
             libc::ioctl(ioctl_fd.as_raw_fd(), FS_IOC_GETFSSYSFSPATH, &mut fs_path)
         };
 
-        let sysfs_fd = if ret == 0 {
+        let sysfs_path: PathBuf = if ret == 0 {
             let name_len = fs_path.len as usize;
             let name = std::str::from_utf8(&fs_path.name[..name_len])
                 .map_err(|_| BchError::from_raw(-libc::EINVAL))?;
-            eprintln!("BcachefsHandle::open_mounted_path(): ioctl FS_IOC_GETFSSYSFSPATH returned {}", name);
-            let sysfs = format!("/sys/fs/{}", name);
-            rustix::fs::open(
-                sysfs.as_str(),
-                rustix::fs::OFlags::RDONLY,
-                rustix::fs::Mode::empty(),
-            ).map_err(|e| BchError::from_raw(-e.raw_os_error()))?
+            eprintln!("BcachefsHandle::open_mounted_path(): FS_IOC_GETFSSYSFSPATH returned {}", name);
+            PathBuf::from(format!("/sys/fs/{}", name))
         } else {
-            eprintln!("BcachefsHandle::open_mounted_path(): ioctl FS_IOC_GETFSSYSFSPATH failed");
-
-            // Fallback: use UUID
-            let uuid_str = format_uuid(&uuid);
-            let sysfs = format!("{}{}", SYSFS_BASE, uuid_str);
-            eprintln!("BcachefsHandle::open_mounted_path(): opening via sysfs {}", sysfs);
-            rustix::fs::open(
-                sysfs.as_str(),
-                rustix::fs::OFlags::RDONLY,
-                rustix::fs::Mode::empty(),
-            ).map_err(|e| BchError::from_raw(-e.raw_os_error()))?
+            eprintln!("BcachefsHandle::open_mounted_path(): FS_IOC_GETFSSYSFSPATH failed, resolving manually");
+            Self::find_bcachefs_sysfs_dir(Uuid::from_bytes(uuid), ioctl_fd.as_fd())
+                .map_err(|e| BchError::from_raw(-e.raw_os_error().unwrap_or(libc::ENOENT)))?
         };
+
+        eprintln!("BcachefsHandle::open_mounted_path(): opening sysfs at {}", sysfs_path.display());
+        let sysfs_fd = rustix::fs::open(
+            &sysfs_path,
+            rustix::fs::OFlags::RDONLY,
+            rustix::fs::Mode::empty(),
+        ).map_err(|e| BchError::from_raw(-e.raw_os_error()))?;
 
         Ok(BcachefsHandle {
             ioctl_fd,
@@ -641,15 +679,36 @@ fn format_uuid(uuid: &[u8; 16]) -> String {
     )
 }
 
-/// Parse a sysfs bcachefs symlink target like "../../fs/bcachefs/<uuid>/dev-N".
-/// Returns (uuid_str, dev_idx).
-fn parse_sysfs_link(target: &str) -> Option<(&str, i32)> {
-    // Find the last '/' to get "dev-N"
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum FsId {
+    /// Modern kernels: directory is named by filesystem UUID.
+    Uuid(uuid::Uuid),
+    /// Pre-6.x kernels: directory is named by block device basename, e.g. "sda5".
+    DevName(String),
+}
+
+impl FsId {
+    fn from_sysfs_name(name: &str) -> Self {
+        match uuid::Uuid::parse_str(name) {
+            Ok(u)  => FsId::Uuid(u),
+            Err(_) => FsId::DevName(name.to_owned()),
+        }
+    }
+
+    pub fn as_sysfs_component(&self) -> std::borrow::Cow<'_, str> {
+        match self {
+            FsId::Uuid(u)    => Cow::Owned(u.hyphenated().to_string()),
+            FsId::DevName(s) => Cow::Borrowed(s),
+        }
+    }
+}
+
+/// Returns (sysfs_fs_id, dev_idx). `sysfs_fs_id` is whatever bcachefs
+/// named the directory under /sys/fs/bcachefs/ — a UUID on >=6.x kernels,
+/// a device basename (e.g. "sda5") on older ones.
+fn parse_sysfs_link(target: &str) -> Option<(FsId, i32)> {
     let (prefix, dev_part) = target.rsplit_once('/')?;
     let dev_idx: i32 = dev_part.strip_prefix("dev-")?.parse().ok()?;
-
-    // Find the uuid — it's the path component before "dev-N"
-    let (_, uuid_str) = prefix.rsplit_once('/')?;
-
-    Some((uuid_str, dev_idx))
+    let (_, fs_id) = prefix.rsplit_once('/')?;
+    Some((FsId::from_sysfs_name(fs_id), dev_idx))
 }
